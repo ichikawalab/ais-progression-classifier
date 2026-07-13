@@ -1,0 +1,50 @@
+# Patient-derived data and experiment artifacts must never be committed.
+data/
+outputs/
+models/
+weights/
+checkpoints/
+artifacts/
+runs/
+logs/
+
+# Model and training artifacts
+*.ckpt
+*.pth
+*.pt
+*.safetensors
+*.onnx
+events.out.tfevents.*
+
+# Medical/raster images and tabular cohort files
+*.dcm
+*.dicom
+*.nii
+*.nii.gz
+*.png
+*.jpg
+*.jpeg
+*.bmp
+*.tif
+*.tiff
+*.csv
+*.tsv
+*.xls
+*.xlsx
+*.parquet
+
+# Only synthetic schema examples are allowed.
+!examples/*.csv
+
+.venv/
+__pycache__/
+*.egg-info/
+lightning_logs/
+*.pyc
+.pytest_cache/
+.ruff_cache/
+dist/
+build/
+.coverage
+htmlcov/
+.claude/settings.local.json

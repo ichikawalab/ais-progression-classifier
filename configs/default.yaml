@@ -1,0 +1,57 @@
+# ===== Data =====
+data:
+  csv_path: null            # Columns: sample_id, patient_id, image_path, label
+  num_workers: 4
+  batch_size: 32            # Default; may be reduced to fit GPU memory
+
+# ===== Cross-validation =====
+cross_validation:
+  num_folds: 10             # Eight train folds, one validation fold, one test fold
+
+# ===== Model =====
+model:
+  arch: resnet50            # Any timm model name, e.g. resnet50 / densenet121 / inception_v3 /
+                             # convnextv2_base / vit_base_patch16_384 / swin_base_patch4_window12_384 /
+                             # efficientnet_b4
+  pretrained: true
+  num_classes: 2
+  hidden_dim: 512
+  dropout: 0.5
+  freeze_backbone: false
+
+# ===== Training =====
+train:
+  max_epochs: 100
+  min_epochs: 10           # EarlyStopping cannot fire before this many epochs
+  lr: 1.0e-5
+  weight_decay: 1.0e-3
+  warmup_epochs: 5
+  early_stopping_patience: 5
+  use_class_weights: true    # Compute class weights from the training subset only
+  precision: "bf16-mixed"    # One of: bf16-mixed | 16-mixed | 32-true.
+                             #   bf16-mixed : recommended default on Ampere+ GPUs (A100 /
+                             #                RTX30xx+ / H100). Wide dynamic range like fp32,
+                             #                no loss scaling, more robust than fp16. Auto
+                             #                falls back to 16-mixed if the GPU lacks bf16,
+                             #                and to 32-true on CPU.
+                             #   16-mixed   : for older GPUs (V100 / Turing / Pascal) where
+                             #                bf16 is slow or unsupported.
+                             #   32-true    : strict numerical reproducibility (mixed
+                             #                precision is not bit-reproducible across GPUs);
+                             #                use when the backbone fits in memory.
+                             # Evaluation and prediction always run in fp32.
+  deterministic: true        # Deterministic algorithms + cuDNN when supported. On CUDA this
+                             # also sets CUBLAS_WORKSPACE_CONFIG (see set_seed).
+  seed: 42
+
+# ===== Augmentation =====
+augment:
+  horizontal_flip: true      # RandomHorizontalFlip (p=0.5)
+  random_resized_crop: true
+  rrc_scale: [0.5, 1.0]      # RandomResizedCrop scale range; aspect ratio is fixed to 1:1
+  rrc_ratio: [1.0, 1.0]
+
+# ===== Output =====
+output:
+  dir: outputs               # Each run creates outputs/<run_name>/
+  run_name: null              # null -> auto-generated as "{arch}_{YYYYmmdd-HHMMSS}"

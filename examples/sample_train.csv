@@ -1,0 +1,5 @@
+sample_id,patient_id,image_path,label
+case001,patient001,data/processed/case001/spine_Front.png,0
+case002,patient002,data/processed/case002/spine_Front.png,1
+case003,patient003,data/processed/case003/spine_Front.png,0
+case004,patient004,data/processed/case004/spine_Front.png,1

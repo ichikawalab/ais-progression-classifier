@@ -1,0 +1,9 @@
+cff-version: 1.2.0
+title: "AIS Progression Classifier"
+message: "If you use this software, please cite this repository."
+type: software
+authors:
+  - name: "Ichikawa Lab"
+repository-code: "https://github.com/ichikawalab/ais-progression-classifier"
+license: MIT
+version: 0.2.0
