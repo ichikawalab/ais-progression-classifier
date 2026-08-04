@@ -1,21 +1,31 @@
-"""Shared helpers: seeding, device selection, run-directory management."""
+"""Shared helpers: seeding, device selection, hashing, run metadata, JSON output."""
 from __future__ import annotations
 
-import datetime as _dt
+import hashlib
+import json
+import math
 import os
+import platform
+import warnings
 from pathlib import Path
+from typing import Any
 
-import pytorch_lightning as pl
+import numpy as np
 import torch
 
 
 def set_seed(seed: int, deterministic: bool = True) -> None:
+    """Seed Python, NumPy and torch, and optionally pin deterministic kernels."""
+    import random
+
+    import pytorch_lightning as pl
+
     if deterministic:
-        # Required for deterministic cuBLAS matmul on CUDA >= 10.2; without it,
-        # torch.use_deterministic_algorithms leaves those ops non-deterministic
-        # (and would raise instead of warn if warn_only were False). Set before
-        # the first CUDA context is created.
+        # Required for deterministic cuBLAS matmul on CUDA >= 10.2. Must be set
+        # before the first CUDA context is created.
         os.environ.setdefault("CUBLAS_WORKSPACE_CONFIG", ":4096:8")
+    random.seed(seed)
+    np.random.seed(seed)
     pl.seed_everything(seed, workers=True)
     torch.backends.cudnn.deterministic = deterministic
     torch.backends.cudnn.benchmark = not deterministic
@@ -26,16 +36,27 @@ def get_device() -> torch.device:
     return torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 
-def resolve_precision(requested: str) -> str:
-    """Resolve the training precision to something the current hardware supports.
+def set_matmul_precision(precision: str) -> None:
+    """Set the fp32 matmul mode, process-wide.
 
-    - Any mixed precision on CPU falls back to "32-true" (AMP needs CUDA).
-    - "bf16-mixed" on a CUDA GPU without bfloat16 support falls back to
-      "16-mixed", since bf16 is emulated (slow) on pre-Ampere hardware.
-    Inference/evaluation always runs in fp32 regardless of this setting.
+    On CUDA Ampere and later, "high" lets fp32 matmuls run as TensorFloat-32:
+    much faster, with a 10-bit rather than 24-bit mantissa. "highest" keeps true
+    fp32. It has no effect on CPU or on pre-Ampere GPUs.
+
+    The published runs enabled "high" globally, so it applied to training *and*
+    to the fp32 inference that produced the reported probabilities. Call this
+    from every entry point that touches torch, so a model never scores new
+    patients under different numerics than it was validated with.
     """
-    mixed = {"16-mixed", "bf16-mixed"}
-    if requested in mixed and not torch.cuda.is_available():
+    torch.set_float32_matmul_precision(precision)
+
+
+def resolve_precision(requested: str) -> str:
+    """Downgrade a mixed-precision request to something the hardware supports.
+
+    Inference always runs in fp32 regardless of this setting.
+    """
+    if requested in {"16-mixed", "bf16-mixed"} and not torch.cuda.is_available():
         return "32-true"
     if (
         requested == "bf16-mixed"
@@ -46,38 +67,109 @@ def resolve_precision(requested: str) -> str:
     return requested
 
 
-def make_run_dir(output_dir: str | Path, run_name: str | None, arch: str) -> Path:
-    """Create (and return) a unique run directory under output_dir.
+def ensure_dir(path: str | Path) -> Path:
+    path = Path(path)
+    path.mkdir(parents=True, exist_ok=True)
+    return path
 
-    If run_name is None, auto-generate "{arch}_{YYYYmmdd-HHMMSS}".
-    If the resulting directory already exists, a numeric suffix is appended
-    to avoid clobbering a previous run.
+
+def json_safe(value: Any) -> Any:
+    """Convert a value into something strict JSON can represent.
+
+    NaN and infinity become null, and NumPy scalars/arrays become plain Python.
+    ``json.dumps`` would otherwise emit bare ``NaN``/``Infinity`` tokens, which
+    Python reads back happily but which are not valid JSON -- so an artefact
+    written here would fail to parse in any other language.
     """
-    output_dir = Path(output_dir)
-    if run_name is None:
-        timestamp = _dt.datetime.now().strftime("%Y%m%d-%H%M%S")
-        run_name = f"{arch}_{timestamp}"
+    if isinstance(value, dict):
+        return {str(key): json_safe(item) for key, item in value.items()}
+    if isinstance(value, (list, tuple)):
+        return [json_safe(item) for item in value]
+    if isinstance(value, np.ndarray):
+        return json_safe(value.tolist())
+    if isinstance(value, np.integer):
+        return int(value)
+    if isinstance(value, (np.floating, float)):
+        number = float(value)
+        return number if math.isfinite(number) else None
+    if isinstance(value, (np.bool_, bool)):
+        return bool(value)
+    if isinstance(value, Path):
+        return str(value)
+    return value
 
-    run_dir = output_dir / run_name
-    if run_dir.exists():
-        i = 1
-        while (output_dir / f"{run_name}_{i}").exists():
-            i += 1
-        run_dir = output_dir / f"{run_name}_{i}"
 
-    run_dir.mkdir(parents=True, exist_ok=False)
-    return run_dir
+def save_json(data: Any, path: str | Path) -> None:
+    """Write strict JSON. Raises rather than emitting a non-finite literal."""
+    path = Path(path)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    payload = json.dumps(json_safe(data), indent=2, ensure_ascii=False, allow_nan=False)
+    path.write_text(payload, encoding="utf-8")
 
 
-def resolve_checkpoint_path(run_dir: str | Path, checkpoint: str) -> Path:
-    """Resolve "best" / "last" / an explicit path to a concrete .ckpt file."""
-    run_dir = Path(run_dir)
-    if checkpoint in ("best", "last"):
-        ckpt_path = run_dir / "checkpoints" / f"{checkpoint}.ckpt"
-        if not ckpt_path.exists():
-            raise FileNotFoundError(f"Checkpoint not found: {ckpt_path}")
-        return ckpt_path
-    ckpt_path = Path(checkpoint)
-    if not ckpt_path.exists():
-        raise FileNotFoundError(f"Checkpoint not found: {ckpt_path}")
-    return ckpt_path
+def load_json(path: str | Path) -> Any:
+    return json.loads(Path(path).read_text(encoding="utf-8"))
+
+
+def file_sha256(path: str | Path, chunk_size: int = 1024 * 1024) -> str:
+    """Content digest of a file, so a result can be tied to the exact input."""
+    digest = hashlib.sha256()
+    with open(path, "rb") as handle:
+        for chunk in iter(lambda: handle.read(chunk_size), b""):
+            digest.update(chunk)
+    return digest.hexdigest()
+
+
+def dataset_fingerprint(csv_path: str | Path, dataset) -> dict:
+    """Identify the exact cohort a run consumed."""
+    labels = dataset["label"] if "label" in dataset.columns else None
+    return {
+        "path": str(csv_path),
+        "sha256": file_sha256(csv_path),
+        "n_patients": int(len(dataset)),
+        "n_progression": int((labels == 1).sum()) if labels is not None else None,
+        "n_non_progression": int((labels == 0).sum()) if labels is not None else None,
+    }
+
+
+def warn_if_not_reproducible(precision: str, deterministic: bool) -> None:
+    """Say plainly what ``deterministic`` does and does not guarantee."""
+    if not deterministic:
+        return
+    if precision != "32-true":
+        warnings.warn(
+            f"train.deterministic is set but train.precision is '{precision}'. "
+            "Mixed precision is not bit-reproducible across GPUs; use '32-true' "
+            "for strict reproducibility.",
+            RuntimeWarning,
+            stacklevel=2,
+        )
+    # torch.use_deterministic_algorithms runs with warn_only=True, so any op
+    # without a deterministic kernel proceeds after printing a warning.
+    warnings.warn(
+        "Deterministic mode is best-effort: operations without a deterministic "
+        "implementation fall back to a non-deterministic one and only warn.",
+        RuntimeWarning,
+        stacklevel=2,
+    )
+
+
+def environment_report(extra: dict[str, Any] | None = None) -> dict[str, Any]:
+    """Capture the software/hardware context needed to interpret a run."""
+    # Local import avoids a module cycle: provenance itself uses file_sha256.
+    from ais_progression.provenance import software_identity
+
+    software = software_identity()
+    report = {
+        "python": platform.python_version(),
+        "platform": platform.platform(),
+        "packages": software["packages"],
+        "cuda_available": torch.cuda.is_available(),
+        "cuda_version": torch.version.cuda,
+        "gpu": torch.cuda.get_device_name(0) if torch.cuda.is_available() else None,
+        "git_commit": software["git_commit"],
+        "git_dirty": software["git_dirty"],
+        "source_tree_sha256": software["source_tree_sha256"],
+    }
+    report.update(extra or {})
+    return report

@@ -1,11 +1,13 @@
 [project]
 name = "ais-progression-classifier"
-version = "0.2.0"
-description = "AIS (adolescent idiopathic scoliosis) progression/non-progression prediction from frontal spine X-rays, with transfer learning (PyTorch Lightning + timm)"
+version = "0.4.0"
+description = "Multimodal ensemble prediction of curve progression in idiopathic scoliosis from frontal and lateral spine radiographs and clinical variables"
 readme = "README.md"
 license = { text = "MIT" }
 authors = [{ name = "Ichikawa Lab" }]
-requires-python = ">=3.10,<3.13"
+# 3.11 is the floor because the test suite reads pyproject.toml with tomllib,
+# which is stdlib only from 3.11.
+requires-python = ">=3.11,<3.13"
 dependencies = [
     "torch>=2.2",
     "torchvision>=0.17",
@@ -14,11 +16,16 @@ dependencies = [
     "opencv-python-headless>=4.9",
     "pandas>=2.0",
     "numpy>=1.26",
-    "scikit-learn>=1.4",
+    # Upper bound is deliberate: the paper's Optuna search spaces use
+    # LogisticRegression(penalty=...) and SVC(probability=True), which
+    # scikit-learn deprecated in 1.8/1.9 and removes in 1.10/1.11.
+    "scikit-learn>=1.4,<1.10",
+    "optuna>=3.6",
+    "joblib>=1.3",
+    "openpyxl>=3.1",
     "grad-cam>=1.5",
     "pyyaml>=6.0",
     "pillow>=10.0",
-    "tensorboard>=2.16",
     "tqdm>=4.66",
 ]
 
@@ -31,13 +38,16 @@ Repository = "https://github.com/ichikawalab/ais-progression-classifier"
 # GPU (CUDA) users: after `uv sync`, replace the CPU/default torch wheels with a
 # CUDA-enabled build, e.g.:
 #   uv pip install torch torchvision --index-url https://download.pytorch.org/whl/cu121
-# See https://pytorch.org/get-started/locally/ for the correct index URL for your CUDA version.
+# See https://pytorch.org/get-started/locally/ for the correct index URL.
 
 [project.scripts]
-ais-preprocess = "ais_progression.commands.preprocess:main"
-ais-train = "ais_progression.commands.train:main"
-ais-gradcam = "ais_progression.commands.gradcam:main"
-ais-predict = "ais_progression.commands.predict:main"
+ais-build-dataset = "ais_progression.cli.build_dataset:main"
+ais-preprocess = "ais_progression.cli.preprocess:main"
+ais-cv-modality = "ais_progression.cli.cv_modality:main"
+ais-cv-ensemble = "ais_progression.cli.cv_ensemble:main"
+ais-train-final = "ais_progression.cli.train_final:main"
+ais-predict = "ais_progression.cli.predict:main"
+ais-gradcam = "ais_progression.cli.gradcam:main"
 
 [build-system]
 requires = ["hatchling"]
@@ -48,3 +58,11 @@ packages = ["src/ais_progression"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
+
+[tool.ruff]
+line-length = 100
+
+[tool.ruff.lint]
+# Beyond the defaults (E4/E7/E9/F): line length, import order, bugbear, and
+# pyupgrade. Without an explicit select, `line-length` above was never enforced.
+select = ["E", "W", "F", "I", "B", "UP"]

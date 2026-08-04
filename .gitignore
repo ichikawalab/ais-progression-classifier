@@ -1,12 +1,14 @@
 # Patient-derived data and experiment artifacts must never be committed.
-data/
-outputs/
-models/
-weights/
-checkpoints/
-artifacts/
-runs/
-logs/
+# Leading slashes anchor these to the repository root, so source packages such
+# as src/ais_progression/models/ stay tracked.
+/data/
+/outputs/
+/models/
+/weights/
+/checkpoints/
+/artifacts/
+/runs/
+/logs/
 
 # Model and training artifacts
 *.ckpt
@@ -14,6 +16,7 @@ logs/
 *.pt
 *.safetensors
 *.onnx
+*.joblib
 events.out.tfevents.*
 
 # Medical/raster images and tabular cohort files

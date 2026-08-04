@@ -1,3 +1,3 @@
-image_path
-data/processed/case101/spine_Front.png
-data/processed/case102/spine_Front.png
+patient_id,front_path,lateral_path,age,sex,risser,cobb_baseline
+newcase001,images/front/newcase001.png,images/lateral/newcase001.png,12.0,2,0,29.5
+newcase002,images/front/newcase002.png,images/lateral/newcase002.png,13.5,2,3,21.0

@@ -1,57 +1,77 @@
+# Default configuration. The values reproduce the settings reported in
+# Arima et al., Global Spine Journal (2026). Override any of them on the
+# command line with --set, e.g. --set train.max_epochs=2.
+
 # ===== Data =====
 data:
-  csv_path: null            # Columns: sample_id, patient_id, image_path, label
+  csv_path: data/dataset.csv   # patient_id, front_path, lateral_path,
+                               # age, sex, risser, cobb_baseline, label
   num_workers: 4
-  batch_size: 32            # Default; may be reduced to fit GPU memory
+  batch_size: 32
 
 # ===== Cross-validation =====
 cross_validation:
-  num_folds: 10             # Eight train folds, one validation fold, one test fold
+  num_reps: 10          # repetitions of the whole 10-fold procedure
+  num_folds: 10         # 1 test fold, 1 fold's worth of validation, 8 for training
+  seed: 42              # repetition r uses seed + r - 1
 
-# ===== Model =====
-model:
-  arch: resnet50            # Any timm model name, e.g. resnet50 / densenet121 / inception_v3 /
-                             # convnextv2_base / vit_base_patch16_384 / swin_base_patch4_window12_384 /
-                             # efficientnet_b4
-  pretrained: true
+# ===== Image models =====
+image:
+  archs:                # short name -> timm architecture (384 x 384 input)
+    vit: vit_base_patch16_384.augreg_in21k_ft_in1k
+    swint: swin_base_patch4_window12_384.ms_in22k_ft_in1k
+    convnextv2: convnextv2_base.fcmae_ft_in22k_in1k_384
   num_classes: 2
-  hidden_dim: 512
+  hidden_dim: 512       # shared head: LayerNorm -> Linear -> GELU -> Dropout -> Linear
   dropout: 0.5
+  pretrained: true      # ImageNet weights
   freeze_backbone: false
 
-# ===== Training =====
+# ===== Image training =====
 train:
   max_epochs: 100
-  min_epochs: 10           # EarlyStopping cannot fire before this many epochs
+  min_epochs: 10             # early stopping cannot fire before this
   lr: 1.0e-5
   weight_decay: 1.0e-3
-  warmup_epochs: 5
-  early_stopping_patience: 5
-  use_class_weights: true    # Compute class weights from the training subset only
-  precision: "bf16-mixed"    # One of: bf16-mixed | 16-mixed | 32-true.
-                             #   bf16-mixed : recommended default on Ampere+ GPUs (A100 /
-                             #                RTX30xx+ / H100). Wide dynamic range like fp32,
-                             #                no loss scaling, more robust than fp16. Auto
-                             #                falls back to 16-mixed if the GPU lacks bf16,
-                             #                and to 32-true on CPU.
-                             #   16-mixed   : for older GPUs (V100 / Turing / Pascal) where
-                             #                bf16 is slow or unsupported.
-                             #   32-true    : strict numerical reproducibility (mixed
-                             #                precision is not bit-reproducible across GPUs);
-                             #                use when the backbone fits in memory.
-                             # Evaluation and prediction always run in fp32.
-  deterministic: true        # Deterministic algorithms + cuDNN when supported. On CUDA this
-                             # also sets CUBLAS_WORKSPACE_CONFIG (see set_seed).
-  seed: 42
+  warmup_epochs: 5           # linear warmup, then cosine annealing
+  early_stopping_patience: 5 # consecutive epochs without val_loss improvement
+  use_class_weights: true    # inverse frequency, from the training subset only
+  precision: "16-mixed"      # bf16-mixed | 16-mixed | 32-true.
+                             #   16-mixed  : the setting used for the paper.
+                             #   bf16-mixed: wider dynamic range on Ampere+ GPUs.
+                             #   32-true   : strict reproducibility; mixed precision
+                             #               is not bit-reproducible across GPUs.
+                             # Inference always runs in fp32.
+  matmul_precision: "high"   # torch fp32 matmul mode: highest | high | medium.
+                             # "high" enables TF32 on Ampere+, as in the paper.
+  deterministic: true        # deterministic algorithms + cuDNN where supported
 
-# ===== Augmentation =====
+# ===== Augmentation (training folds only) =====
 augment:
-  horizontal_flip: true      # RandomHorizontalFlip (p=0.5)
+  horizontal_flip: true      # p = 0.5
   random_resized_crop: true
-  rrc_scale: [0.5, 1.0]      # RandomResizedCrop scale range; aspect ratio is fixed to 1:1
-  rrc_ratio: [1.0, 1.0]
+  rrc_scale: [0.5, 1.0]      # crop area, 50-100% of the image
+  rrc_ratio: [1.0, 1.0]      # aspect ratio fixed at 1:1
+
+# ===== Clinical models =====
+clinical:
+  numeric_features: [age, cobb_baseline]   # z-scored
+  binary_features: [sex]                   # one-hot; 1 = male, 2 = female
+  ordinal_features: [risser]               # ordinal, Risser 0-5
+  n_trials: 30              # Optuna trials per outer fold
+  inner_folds: 10           # inner stratified K-fold for the search
+
+# ===== Ensemble =====
+ensemble:
+  n_trials: 30
+  inner_folds: 10
+
+# ===== Final (deployable) model =====
+# Trained on the whole cohort; the epoch count comes from the cross-validation
+# runs, so there is no validation fraction to set here.
+final:
+  seed: 42
 
 # ===== Output =====
 output:
-  dir: outputs               # Each run creates outputs/<run_name>/
-  run_name: null              # null -> auto-generated as "{arch}_{YYYYmmdd-HHMMSS}"
+  dir: outputs        # cv/<modality>_<model>/, ensemble/<method>/, final/

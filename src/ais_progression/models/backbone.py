@@ -1,4 +1,4 @@
-"""Transfer-learning model: a timm backbone + a small classification head."""
+"""Transfer-learning model: an ImageNet-pretrained timm backbone + a shared head."""
 from __future__ import annotations
 
 import timm
@@ -7,6 +7,11 @@ import torch.nn as nn
 
 
 class TransferModel(nn.Module):
+    """The paper's shared classification head on top of any timm backbone.
+
+    Head: LayerNorm -> Linear(feat_dim, hidden_dim) -> GELU -> Dropout -> Linear(2).
+    """
+
     def __init__(
         self,
         arch: str,
@@ -20,11 +25,11 @@ class TransferModel(nn.Module):
         self.arch = arch
         self.freeze_backbone = freeze_backbone
 
-        # num_classes=0 strips the classification head, returning pooled features.
+        # num_classes=0 strips timm's own head, leaving pooled features.
         self.backbone = timm.create_model(arch, pretrained=pretrained, num_classes=0)
         if freeze_backbone:
-            for param in self.backbone.parameters():
-                param.requires_grad_(False)
+            for parameter in self.backbone.parameters():
+                parameter.requires_grad_(False)
 
         feat_dim = self.backbone.num_features
         self.classifier = nn.Sequential(
@@ -36,5 +41,4 @@ class TransferModel(nn.Module):
         )
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
-        feats = self.backbone(x)
-        return self.classifier(feats)
+        return self.classifier(self.backbone(x))

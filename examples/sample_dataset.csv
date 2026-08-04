@@ -1,0 +1,5 @@
+patient_id,front_path,lateral_path,age,sex,risser,cobb_baseline,label
+synthetic001,images/front/synthetic001.png,images/lateral/synthetic001.png,11.4,2,0,31.0,1
+synthetic002,images/front/synthetic002.png,images/lateral/synthetic002.png,13.8,2,4,22.5,0
+synthetic003,images/front/synthetic003.png,images/lateral/synthetic003.png,12.1,1,1,28.0,1
+synthetic004,images/front/synthetic004.png,images/lateral/synthetic004.png,14.2,2,4,19.0,0
