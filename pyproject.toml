@@ -16,7 +16,7 @@ dependencies = [
     "opencv-python-headless>=4.9",
     "pandas>=2.0",
     "numpy>=1.26",
-    # Upper bound is deliberate: the paper's Optuna search spaces use
+    # Upper bound is deliberate: the Optuna search spaces use
     # LogisticRegression(penalty=...) and SVC(probability=True), which
     # scikit-learn deprecated in 1.8/1.9 and removes in 1.10/1.11.
     "scikit-learn>=1.4,<1.10",

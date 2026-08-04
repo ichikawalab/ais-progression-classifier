@@ -2,7 +2,7 @@
 
 Layers, from the bottom up:
 
-* ``config``        typed configuration, defaulting to the published settings
+* ``config``        typed configuration, defaulting to the reference settings
 * ``data``          the unified dataset CSV, preprocessing, and image loaders
 * ``models``        the individual image and clinical models
 * ``ensemble``      late fusion of their predicted probabilities

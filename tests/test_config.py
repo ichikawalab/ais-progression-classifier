@@ -1,7 +1,7 @@
 import pytest
 
 from ais_progression.config import (
-    PAPER_ARCHS,
+    REFERENCE_ARCHS,
     Config,
     load_config,
     parse_set_args,
@@ -11,7 +11,7 @@ from ais_progression.config import (
 )
 
 
-def test_defaults_match_the_published_settings():
+def test_defaults_match_the_reference_settings():
     config = load_config()
     assert config.cross_validation.num_reps == 10
     assert config.cross_validation.num_folds == 10
@@ -27,11 +27,11 @@ def test_defaults_match_the_published_settings():
     assert config.augment.rrc_scale == [0.5, 1.0]
     assert config.augment.rrc_ratio == [1.0, 1.0]
     assert config.clinical.features == ["age", "cobb_baseline", "sex", "risser"]
-    assert set(config.image.archs) == set(PAPER_ARCHS)
+    assert set(config.image.archs) == set(REFERENCE_ARCHS)
 
 
 def test_all_three_backbones_take_384_pixel_inputs():
-    for arch in PAPER_ARCHS.values():
+    for arch in REFERENCE_ARCHS.values():
         assert "384" in arch
 
 

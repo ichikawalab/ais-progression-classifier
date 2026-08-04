@@ -3,7 +3,7 @@
 Weights are searched with Optuna TPE: each model gets a weight in [0, 1], the
 vector is normalised to sum to one, and the objective is the mean AUC of the
 weighted average across an inner stratified K-fold. This is the ensemble method
-that performed best in the paper.
+that performed best.
 """
 from __future__ import annotations
 

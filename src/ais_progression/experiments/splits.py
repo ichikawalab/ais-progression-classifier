@@ -71,7 +71,7 @@ def iter_folds(
 
     One fold is held out for test. When ``with_validation`` is set, a stratified
     slice of size ``1/(num_folds-1)`` is carved out of the remaining folds for
-    early stopping, leaving eight folds' worth of training data at the paper's
+    early stopping, leaving eight folds' worth of training data at the
     ten-fold setting. Models that tune with an inner cross-validation instead
     (the clinical and ensemble learners) pass ``with_validation=False`` and get
     an empty validation frame.

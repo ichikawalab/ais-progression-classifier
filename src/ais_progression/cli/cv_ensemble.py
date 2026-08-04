@@ -26,7 +26,7 @@ def build_arg_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         description=(
             "Combine the individual models' out-of-fold probabilities. "
-            "'weighted' is the paper's best-performing method; 'average', "
+            "'weighted' is the best-performing method; 'average', "
             "'logreg', 'svm' and 'rf' are the comparators."
         )
     )

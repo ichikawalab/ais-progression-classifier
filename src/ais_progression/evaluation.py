@@ -39,7 +39,7 @@ def safe_auc(y_true, prob) -> float | None:
 
 
 def youden_threshold(y_true, prob) -> float:
-    """Threshold maximising sensitivity + specificity - 1, as used in the paper."""
+    """Threshold maximising sensitivity + specificity - 1."""
     y_true = np.asarray(y_true, dtype=int)
     prob = np.asarray(prob, dtype=float)
     if np.unique(y_true).size < 2:
@@ -52,7 +52,7 @@ def binary_metrics(y_true, prob, threshold: float | None = None) -> dict:
     """AUC plus threshold-dependent metrics.
 
     ``threshold=None`` selects the Youden-index threshold, matching how the
-    paper binarised predicted probabilities.
+    reference runs binarised predicted probabilities.
     """
     y_true = np.asarray(y_true, dtype=int)
     prob = np.asarray(prob, dtype=float)
@@ -120,7 +120,7 @@ def auc_by_rep(predictions: pd.DataFrame, split: str) -> pd.DataFrame:
     """AUC per repetition.
 
     For ``split="test"`` this pools the out-of-fold predictions of a repetition
-    into a single ROC over the whole cohort -- the paper's ``trial_n`` column.
+    into a single ROC over the whole cohort -- the reference ``trial_n`` column.
     For ``split="val"`` each fold has its own validation subset, so the AUC is
     computed per fold and then averaged within the repetition.
     """

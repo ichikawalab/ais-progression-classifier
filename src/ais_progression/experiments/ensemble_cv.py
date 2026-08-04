@@ -14,7 +14,7 @@ patient's own -- including the current test fold. The fusion weights are
 therefore chosen with indirect knowledge of the test fold, which biases the
 reported ensemble AUC upward. Removing it would mean regenerating the base
 models' out-of-fold probabilities separately inside each outer fold, i.e. ten
-times the image training, and would no longer be the published procedure. It is
+times the image training, and would no longer be the reference procedure. It is
 recorded in ``STACKING_LEAKAGE_WARNING`` and in the README instead.
 """
 from __future__ import annotations
@@ -52,13 +52,13 @@ ENSEMBLE_METHOD_SELECTION_WARNING = (
     "Comparing several ensemble methods on these same test folds and keeping "
     "the best one adds selection bias to the stacking leakage described separately. "
     "It turns the test folds into a selection set and biases the reported "
-    "performance upward. The published choice of weighted averaging was made this "
+    "performance upward. The choice of weighted averaging was made this "
     "way, so its AUC should be read as a selected-best value. Confirming it "
     "requires an independent external cohort or a nested selection design."
 )
 
 STACKING_LEAKAGE_WARNING = (
-    "The published stacking protocol reuses one base-model out-of-fold matrix. "
+    "The stacking protocol reuses one base-model out-of-fold matrix. "
     "For an ensemble outer fold, its training patients' probabilities can therefore "
     "come from base models that were trained on the current test fold. The fusion "
     "weights have indirect knowledge of that fold, so the ensemble AUC may be "

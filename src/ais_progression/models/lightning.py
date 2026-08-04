@@ -78,7 +78,7 @@ class ImageClassifier(pl.LightningModule):
         )
 
         # Epoch-wise linear warmup from 0.1x to 1.0x, then cosine decay to 0 at
-        # max_epochs. Matches the schedule used for the published results.
+        # max_epochs. Matches the reference schedule.
         def lr_lambda(epoch: int) -> float:
             if epoch < train_cfg.warmup_epochs:
                 return 0.1 + 0.9 * epoch / train_cfg.warmup_epochs

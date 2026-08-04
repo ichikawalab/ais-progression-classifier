@@ -3,10 +3,6 @@
 Multimodal ensemble prediction of curve progression in idiopathic scoliosis from
 frontal and lateral whole-spine radiographs plus clinical variables.
 
-Reference implementation for Arima et al., *Development and Validation of a
-Multi-Modal Ensemble Model for Predicting Progression in Idiopathic Scoliosis*,
-Global Spine Journal (2026).
-
 > **Research use only.** This software is not a validated medical device and
 > must not be used for clinical decision-making.
 
@@ -21,7 +17,7 @@ Nine individual models across three modalities, combined by late fusion:
 | Clinical variables | Logistic regression, SVM, random forest |
 
 Their predicted probabilities are combined by weighted averaging (the
-best-performing method in the paper), or by simple averaging, logistic
+best-performing method here), or by simple averaging, logistic
 regression, SVM, or random forest for comparison.
 
 There are two separate paths through the code:
@@ -47,7 +43,7 @@ attached to it is the cross-validated one.
 
 ```text
 src/ais_progression/
-|-- config.py         typed configuration; defaults reproduce the paper
+|-- config.py         typed configuration; defaults are the reference settings
 |-- evaluation.py     AUC and threshold-dependent metrics
 |-- utils.py          seeding, device selection, run metadata
 |-- data/             dataset schema, workbook ingestion, preprocessing, loaders
@@ -223,8 +219,8 @@ outputs/
 
 * `test_auc_pooled_per_rep` - the headline number. Within a repetition every
   patient has exactly one out-of-fold prediction, so the folds combine into a
-  single ROC over the whole cohort; its mean and SD across repetitions are what
-  the paper reports.
+  single ROC over the whole cohort. Its mean and SD across repetitions are the
+  figure to report.
 * `test_auc_per_fold` - test AUC of each individual fold.
 * `selection_auc_by_source` - the AUC that drove model selection, grouped by
   where it came from and never pooled across kinds. For image models it is a
@@ -347,7 +343,7 @@ bundle.release()                 # drop them and free GPU memory
 ais-gradcam --bundle-dir outputs/final --modality front --model convnextv2 --input-csv data/dataset.csv --limit 20
 ```
 
-The paper's three backbones are ViT, Swin and ConvNeXtV2; the target-layer
+The three configured backbones are ViT, Swin and ConvNeXtV2; the target-layer
 resolver also covers ResNet, DenseNet, Inception and EfficientNet, so a bundle
 built after swapping `image.archs` for one of those still works. Grad-CAM is
 exploratory and does not establish a causal explanation for a prediction.
@@ -355,7 +351,7 @@ exploratory and does not establish a causal explanation for a prediction.
 ## Configuration
 
 Defaults live in [configs/default.yaml](configs/default.yaml) and reproduce the
-published settings: AdamW at lr 1e-5 with weight decay 1e-3, batch size 32, up
+reference settings: AdamW at lr 1e-5 with weight decay 1e-3, batch size 32, up
 to 100 epochs with a 5-epoch linear warmup then cosine annealing, early stopping
 after 5 epochs without validation improvement, inverse-frequency class weights,
 384x384 inputs, and a shared head of LayerNorm, Linear(512), GELU, Dropout(0.5),
@@ -390,12 +386,12 @@ with a small CNN, so they finish in seconds on CPU.
 - The ensemble method was chosen by comparing candidates on the same test folds
   that report its performance, so its AUC is a selected-best value.
 - The ensembles are fitted on a single out-of-fold probability matrix, as in the
-  published procedure. A training patient's probability therefore came from a
+  reference procedure. A training patient's probability therefore came from a
   base model that had seen the current test fold, so the fusion weights are
   chosen with indirect knowledge of it and the reported ensemble AUC is
   optimistic. Removing this would mean regenerating the base models' out-of-fold
   probabilities inside every outer fold -- ten times the image training, and no
-  longer the published method.
+  longer the reference method.
 - The final serving weights are refitted on all base-model OOF probabilities,
   while AUC, threshold and calibration are estimated from outer-fold ensemble
   predictions. As with any full-data refit after cross-validation, those values

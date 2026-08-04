@@ -14,7 +14,7 @@ from ais_progression.models.lightning import ImageClassifier
 TINY_ARCH = "resnet18"
 
 
-def test_classification_head_matches_the_published_architecture():
+def test_classification_head_matches_the_reference_architecture():
     model = ImageClassifier(
         ImageConfig(pretrained=False), TrainConfig(), TINY_ARCH, initialize_pretrained=False
     ).model
@@ -33,7 +33,7 @@ def test_forward_produces_two_logits_per_image():
     assert module(torch.randn(2, 3, 64, 64)).shape == (2, 2)
 
 
-def test_optimizer_is_adamw_with_the_published_hyperparameters():
+def test_optimizer_is_adamw_with_the_reference_hyperparameters():
     train_cfg = TrainConfig()
     module = ImageClassifier(
         ImageConfig(pretrained=False), train_cfg, TINY_ARCH, initialize_pretrained=False
@@ -126,7 +126,7 @@ def test_early_stopping_leaves_the_hook_choice_to_lightning(small_config, tmp_pa
     """check_on_train_epoch_end must stay unpinned.
 
     Lightning resolves None to True whenever validation runs once per epoch --
-    the published behaviour. Pinning True would keep checking at train-epoch end
+    the reference behaviour. Pinning True would keep checking at train-epoch end
     against a stale val_loss if the validation cadence ever changed.
     """
     from ais_progression.models.image_model import build_callbacks
@@ -138,7 +138,7 @@ def test_early_stopping_leaves_the_hook_choice_to_lightning(small_config, tmp_pa
     assert early_stopping._check_on_train_epoch_end is None
 
 
-def test_early_stopping_resolves_to_the_published_hook(small_config, tmp_path):
+def test_early_stopping_resolves_to_the_reference_hook(small_config, tmp_path):
     """With one validation pass per epoch, Lightning resolves the hook to True."""
     import pytorch_lightning as pl
 

@@ -135,7 +135,7 @@ def run_modality_cv(
     Completed folds are skipped when ``resume`` is set, so an interrupted run can
     be restarted with the same command.
 
-    Note on seeding: the published code seeded once per repetition and let the
+    Note on seeding: the earlier implementation seeded once per repetition and let the
     RNG carry across that repetition's folds, so a fold's result depended on
     every fold before it. Here each fold is re-seeded with its repetition's seed,
     which makes a fold reproducible on its own -- the precondition for resuming.

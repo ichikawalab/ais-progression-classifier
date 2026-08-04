@@ -1,6 +1,6 @@
 """Radiograph preprocessing: CLAHE, then zero-padding to a square canvas.
 
-Reproduces the paper's preprocessing. Intensity normalisation with the
+The reference preprocessing. Intensity normalisation with the
 ImageNet mean/std happens later, inside the training transform.
 
 cv2.imread/imwrite silently fail on non-ASCII (e.g. Japanese) paths on Windows,

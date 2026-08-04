@@ -1,8 +1,7 @@
 """Configuration: YAML defaults + CLI overrides -> typed dataclasses.
 
 Override priority: ``--set`` dotted overrides > explicit CLI flags > YAML file >
-the dataclass defaults below. The defaults reproduce the settings reported in
-Arima et al., *Global Spine Journal* (2026).
+the dataclass defaults below. The defaults are the reference settings.
 """
 from __future__ import annotations
 
@@ -12,14 +11,14 @@ from typing import Any
 
 import yaml
 
-# Backbones reported in the paper, keyed by the short name used on the CLI.
-PAPER_ARCHS: dict[str, str] = {
+# Backbones of the reference configuration, keyed by the short name used on the CLI.
+REFERENCE_ARCHS: dict[str, str] = {
     "vit": "vit_base_patch16_384.augreg_in21k_ft_in1k",
     "swint": "swin_base_patch4_window12_384.ms_in22k_ft_in1k",
     "convnextv2": "convnextv2_base.fcmae_ft_in22k_in1k_384",
 }
 
-IMAGE_MODELS = tuple(PAPER_ARCHS)
+IMAGE_MODELS = tuple(REFERENCE_ARCHS)
 CLINICAL_MODELS = ("logreg", "svm", "rf")
 
 # The single source of truth for modality names; imported rather than re-spelled.
@@ -48,7 +47,7 @@ class DataConfig:
 
 @dataclass
 class CrossValidationConfig:
-    """Repeated stratified K-fold, as used for every modality in the paper."""
+    """Repeated stratified K-fold, as used for every modality."""
 
     num_reps: int = 10
     num_folds: int = 10
@@ -57,7 +56,7 @@ class CrossValidationConfig:
 
 @dataclass
 class ImageConfig:
-    archs: dict[str, str] = field(default_factory=lambda: dict(PAPER_ARCHS))
+    archs: dict[str, str] = field(default_factory=lambda: dict(REFERENCE_ARCHS))
     num_classes: int = 2
     hidden_dim: int = 512
     dropout: float = 0.5

@@ -111,7 +111,7 @@ def summarize_run(predictions: pd.DataFrame, fold_metrics: pd.DataFrame) -> dict
     ``test_auc_pooled_per_rep`` is the headline number: within a repetition every
     patient has exactly one out-of-fold prediction, so the ten folds combine into
     a single ROC over the whole cohort. Its mean and SD across repetitions are
-    what the paper reports.
+    the figure to report.
     """
     summary: dict = {
         "n_folds_completed": int(len(fold_metrics)),
@@ -142,7 +142,7 @@ def summarize_run(predictions: pd.DataFrame, fold_metrics: pd.DataFrame) -> dict
     test = predictions[predictions["split"] == "test"]
     if not test.empty:
         # Threshold-dependent metrics are computed per repetition and then
-        # averaged, which is how the paper's tables were produced. Averaging the
+        # averaged, which is how the reference tables were produced. Averaging the
         # probabilities first and thresholding once is a different quantity.
         per_rep_metrics = [
             binary_metrics(group["true_label"], group["prob"])

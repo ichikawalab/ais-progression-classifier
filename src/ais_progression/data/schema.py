@@ -6,7 +6,7 @@
 * ``front_path``  frontal whole-spine radiograph (absolute, or relative to the CSV).
 * ``lateral_path`` lateral whole-spine radiograph.
 * ``age``         age at the initial visit, in years.
-* ``sex``         1 = male, 2 = female (the paper's ``Sex_M1_F2`` coding).
+* ``sex``         1 = male, 2 = female (the source workbook's ``Sex_M1_F2`` coding).
 * ``risser``      Risser sign 0-5, treated as ordinal.
 * ``cobb_baseline`` baseline Cobb angle in degrees.
 * ``label``       0 = non-progression (<=5 deg), 1 = progression (>=10 deg).
@@ -241,7 +241,7 @@ def load_dataset(
 
 
 def describe_dataset(df: pd.DataFrame) -> dict:
-    """Cohort summary mirroring the paper's Table 1."""
+    """Cohort summary: the baseline characteristics table."""
     summary: dict = {"n_patients": int(len(df))}
     if LABEL_COLUMN in df.columns:
         counts = df[LABEL_COLUMN].value_counts()

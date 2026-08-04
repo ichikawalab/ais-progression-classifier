@@ -77,7 +77,7 @@ def build_callbacks(
 ) -> tuple[ModelCheckpoint, EarlyStopping]:
     """Checkpointing and early stopping for one training run.
 
-    The published code also passed ``strict=True`` and
+    The earlier implementation also passed ``strict=True`` and
     ``check_on_train_epoch_end=True`` to EarlyStopping. Both are already
     Lightning's behaviour here -- ``strict`` defaults to True, and
     ``check_on_train_epoch_end`` defaults to None, which resolves to True

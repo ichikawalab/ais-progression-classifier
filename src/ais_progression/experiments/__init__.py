@@ -1,4 +1,4 @@
-"""The paper's evaluation protocol: repeated stratified nested cross-validation."""
+"""The evaluation protocol: repeated stratified nested cross-validation."""
 from ais_progression.experiments.ensemble_cv import (
     build_oof_matrix,
     load_base_predictions,

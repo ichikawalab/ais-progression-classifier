@@ -56,7 +56,7 @@ def set_matmul_precision(precision: str) -> None:
     much faster, with a 10-bit rather than 24-bit mantissa. "highest" keeps true
     fp32. It has no effect on CPU or on pre-Ampere GPUs.
 
-    The published runs enabled "high" globally, so it applied to training *and*
+    The reference runs enable "high" globally, so it applied to training *and*
     to the fp32 inference that produced the reported probabilities. Call this
     from every entry point that touches torch, so a model never scores new
     patients under different numerics than it was validated with.

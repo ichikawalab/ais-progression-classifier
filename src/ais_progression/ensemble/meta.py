@@ -4,10 +4,10 @@ The meta-learners (logistic regression, SVM, random forest) are trained on the
 nine base models' predicted probabilities. No feature preprocessing is applied:
 the inputs are already probabilities on a common scale.
 
-The search spaces here are deliberately *not* the clinical ones: the published
-code widened the SVM's gamma range and narrowed the random forest's depth for
-this stage. Those two bounds are the whole difference, so the spaces themselves
-are shared with the clinical modality and only the ranges are rebound.
+The search spaces here are deliberately *not* the clinical ones: this stage
+widens the SVM's gamma range and narrows the random forest's depth. Those two
+bounds are the whole difference, so the spaces themselves are shared with the
+clinical modality and only the ranges are rebound.
 """
 from __future__ import annotations
 
@@ -31,8 +31,8 @@ from ais_progression.models.clinical_model import (
 optuna.logging.set_verbosity(optuna.logging.WARNING)
 
 
-# The published code widened the SVM's gamma range and narrowed the forest's
-# depth for this stage; logistic regression was shared unchanged.
+# This stage widens the SVM's gamma range and narrows the forest's depth;
+# logistic regression is shared with the clinical modality unchanged.
 ENSEMBLE_GAMMA_RANGE = (1e-3, 10.0)
 ENSEMBLE_MAX_DEPTH_RANGE = (3, 10)
 

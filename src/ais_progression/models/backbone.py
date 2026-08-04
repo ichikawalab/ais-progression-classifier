@@ -7,7 +7,7 @@ import torch.nn as nn
 
 
 class TransferModel(nn.Module):
-    """The paper's shared classification head on top of any timm backbone.
+    """The shared classification head on top of any timm backbone.
 
     Head: LayerNorm -> Linear(feat_dim, hidden_dim) -> GELU -> Dropout -> Linear(2).
     """

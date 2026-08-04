@@ -1,4 +1,4 @@
-"""Grad-CAM must work for all three backbone families used in the paper.
+"""Grad-CAM must work for all three configured backbone families.
 
 ViT and Swin need a reshape from tokens back to a spatial grid, and that reshape
 is the part most likely to break on a timm upgrade. These tests use small

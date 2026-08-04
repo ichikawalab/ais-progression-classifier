@@ -114,7 +114,7 @@ def test_unknown_meta_model_is_rejected(base_probabilities):
 
 
 def test_ensemble_search_spaces_differ_from_the_clinical_ones():
-    """The published code widened SVM gamma and narrowed RF depth for the ensemble."""
+    """The ensemble stage widens SVM gamma and narrows RF depth."""
     import optuna
 
     from ais_progression.ensemble.meta import ENSEMBLE_SEARCH_SPACES
