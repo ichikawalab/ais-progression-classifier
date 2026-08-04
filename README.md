@@ -68,13 +68,28 @@ cd ais-progression-classifier
 uv sync
 ```
 
-For NVIDIA GPU training, replace the default torch wheels with a CUDA build
-following the [official PyTorch instructions](https://pytorch.org/get-started/locally/).
-Verify:
+### GPU training
+
+`uv sync` resolves torch from PyPI, whose Windows wheels are CPU-only (the Linux
+ones do carry CUDA). For NVIDIA training on Windows, replace them from PyTorch's
+own index afterwards -- the CUDA variant has to match the torch version the lock
+file pins, and not every variant is published for every platform:
+
+```powershell
+uv pip install --reinstall torch torchvision --index-url https://download.pytorch.org/whl/cu130
+```
+
+Pick the variant for your driver from the
+[official PyTorch instructions](https://pytorch.org/get-started/locally/); `cu130`
+is what torch 2.12 ships for Windows. Verify:
 
 ```powershell
 uv run python -c "import torch; print(torch.cuda.is_available(), torch.version.cuda)"
 ```
+
+`uv pip install` changes the environment without touching `uv.lock`, so a later
+`uv sync` puts the CPU wheels back. Re-run the command above if training
+suddenly falls back to the CPU.
 
 ## Data format
 

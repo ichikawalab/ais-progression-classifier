@@ -35,10 +35,13 @@ dev = ["pytest>=8.0", "ruff>=0.4"]
 [project.urls]
 Repository = "https://github.com/ichikawalab/ais-progression-classifier"
 
-# GPU (CUDA) users: after `uv sync`, replace the CPU/default torch wheels with a
-# CUDA-enabled build, e.g.:
-#   uv pip install torch torchvision --index-url https://download.pytorch.org/whl/cu121
-# See https://pytorch.org/get-started/locally/ for the correct index URL.
+# torch is resolved from PyPI, whose Windows wheels are CPU-only. GPU users
+# replace them after `uv sync`, from PyTorch's own index:
+#   uv pip install --reinstall torch torchvision --index-url https://download.pytorch.org/whl/cu130
+# The CUDA variant must exist for the pinned torch version on your platform --
+# torch 2.12 publishes cu130 for Windows, not cu128/cu129. That command does not
+# update uv.lock, so the next `uv sync` restores the CPU wheels.
+# See https://pytorch.org/get-started/locally/ for the current index URLs.
 
 [project.scripts]
 ais-build-dataset = "ais_progression.cli.build_dataset:main"
