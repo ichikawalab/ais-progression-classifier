@@ -6,9 +6,11 @@ from pathlib import Path
 
 from ais_progression.cli._common import (
     add_config_arguments,
+    add_cpu_argument,
     add_data_arguments,
     build_config,
     require_dataset_csv,
+    require_gpu,
 )
 from ais_progression.config import (
     CLINICAL_MODELS,
@@ -68,6 +70,7 @@ def build_arg_parser() -> argparse.ArgumentParser:
         help="Keep each fold's weights. Off by default: only predictions are needed, "
         "and a full run would otherwise write hundreds of gigabytes.",
     )
+    add_cpu_argument(parser)
     return parser
 
 
@@ -83,6 +86,8 @@ def main(argv: list[str] | None = None) -> None:
         )
 
     needs_images = is_image_modality(args.modality)
+    if needs_images:
+        require_gpu(args.allow_cpu)
     dataset_csv = require_dataset_csv(config)
     dataset = load_dataset(
         dataset_csv,

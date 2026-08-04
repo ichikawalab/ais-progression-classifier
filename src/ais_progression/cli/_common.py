@@ -50,6 +50,43 @@ def build_config(args: argparse.Namespace) -> Config:
     )
 
 
+def add_cpu_argument(parser: argparse.ArgumentParser) -> None:
+    parser.add_argument(
+        "--allow-cpu",
+        action="store_true",
+        help="Train image models without a GPU. Refused by default because a "
+        "full run takes days on a GPU and would not finish on a CPU.",
+    )
+
+
+def require_gpu(allow_cpu: bool) -> None:
+    """Refuse to start image training on the CPU unless it was asked for.
+
+    Torch reports a missing GPU and carries on, so a run that should take hours
+    quietly becomes one that never finishes -- and nothing about the output says
+    which it was. The usual cause on Windows is an environment that reverted to
+    the CPU wheels: PyPI has no CUDA build there, and ``uv run`` re-syncs from
+    the lock file before every command, so an installed CUDA build is replaced
+    unless the command passes ``--no-sync``.
+    """
+    import torch
+
+    if torch.cuda.is_available() or allow_cpu:
+        return
+    raise SystemExit(
+        f"No GPU available to torch (installed build: {torch.__version__}). Image "
+        "training would run on the CPU and take far longer than the protocol "
+        "assumes.\n"
+        "  If the build ends in '+cpu', reinstall the CUDA one:\n"
+        "    uv pip install --reinstall torch torchvision "
+        "--index-url https://download.pytorch.org/whl/cu130\n"
+        "  Then run commands with 'uv run --no-sync ...', or call "
+        ".venv/Scripts/ directly: plain 'uv run' re-syncs and puts the CPU "
+        "wheels back.\n"
+        "  Pass --allow-cpu if you really mean to train on the CPU."
+    )
+
+
 def require_dataset_csv(config: Config) -> Path:
     if config.data.csv_path is None:
         raise SystemExit(

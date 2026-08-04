@@ -6,9 +6,11 @@ from pathlib import Path
 
 from ais_progression.cli._common import (
     add_config_arguments,
+    add_cpu_argument,
     add_data_arguments,
     build_config,
     require_dataset_csv,
+    require_gpu,
 )
 from ais_progression.config import (
     CLINICAL_MODALITY,
@@ -87,6 +89,7 @@ def build_arg_parser() -> argparse.ArgumentParser:
         help="Store full Lightning checkpoints. By default only the model weights "
         "(state_dict) are written, which is smaller and loads without unpickling.",
     )
+    add_cpu_argument(parser)
     return parser
 
 
@@ -111,6 +114,15 @@ def main(argv: list[str] | None = None) -> None:
     args = build_arg_parser().parse_args(argv)
     if args.threshold_policy == "target_sensitivity" and not 0 < args.target_sensitivity <= 1:
         raise SystemExit("--target-sensitivity must be in (0, 1]")
+    # Only a profile that names an image modality causes image training; a
+    # clinical-only bundle is scikit-learn throughout and needs no GPU. ``None``
+    # means "every available base model", which may well include images.
+    requested_profiles = parse_profiles(args.profile)
+    if any(
+        modalities is None or any(m != CLINICAL_MODALITY for m in modalities)
+        for modalities in requested_profiles.values()
+    ):
+        require_gpu(args.allow_cpu)
     config = build_config(args)
     dataset_csv = require_dataset_csv(config)
 
@@ -128,7 +140,6 @@ def main(argv: list[str] | None = None) -> None:
     base_predictions = load_base_predictions(sources)
     print(f"Base models from cross-validation: {', '.join(sorted(base_predictions))}")
 
-    requested_profiles = parse_profiles(args.profile)
     selected_members = {
         member
         for modalities in requested_profiles.values()
