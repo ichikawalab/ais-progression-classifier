@@ -6,6 +6,7 @@ import json
 import math
 import os
 import platform
+import sys
 import warnings
 from pathlib import Path
 from typing import Any
@@ -30,6 +31,18 @@ def set_seed(seed: int, deterministic: bool = True) -> None:
     torch.backends.cudnn.deterministic = deterministic
     torch.backends.cudnn.benchmark = not deterministic
     torch.use_deterministic_algorithms(deterministic, warn_only=True)
+
+
+def progress_bar_enabled() -> bool:
+    """Show a training progress bar on a terminal, but not into a file.
+
+    A fold can run for tens of minutes with nothing printed, which is
+    indistinguishable from a hang. A bar fixes that interactively -- but it
+    redraws with carriage returns, so a run redirected to a log would bury its
+    hundred fold-result lines under megabytes of partial redraws. Detect the
+    difference rather than asking the caller to remember a flag.
+    """
+    return sys.stdout.isatty()
 
 
 def get_device() -> torch.device:

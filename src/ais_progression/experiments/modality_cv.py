@@ -33,7 +33,7 @@ from ais_progression.models.image_model import (
     predict_image_model,
 )
 from ais_progression.provenance import modality_run_identity
-from ais_progression.utils import set_seed
+from ais_progression.utils import progress_bar_enabled, set_seed
 
 CLINICAL_MODALITY = "clinical"
 
@@ -46,7 +46,13 @@ def _run_image_fold(
     config: Config, arch: str, modality: str, split: Fold, fold_dir: Path, keep_checkpoints: bool
 ) -> tuple[pd.DataFrame, dict]:
     fit = fit_image_model(
-        config, arch, modality, split.train, split.val, fold_dir, enable_progress_bar=False
+        config,
+        arch,
+        modality,
+        split.train,
+        split.val,
+        fold_dir,
+        enable_progress_bar=progress_bar_enabled(),
     )
     classifier = load_image_classifier(fit.checkpoint_path, config, arch)
 
@@ -167,6 +173,13 @@ def run_modality_cv(
             print(f"[{run_name(modality, model)}] {label}: already done, skipping")
             continue
 
+        # Announced before training, not only after: the progress bar below
+        # counts epochs within a fold and says nothing about which of the
+        # hundred folds is on screen.
+        print(
+            f"[{run_name(modality, model)}] {label} ({completed}/{total}): training",
+            flush=True,
+        )
         set_seed(rep_seed(cv.seed, split.rep), deterministic=config.train.deterministic)
         if is_clinical:
             predictions, metrics = _run_clinical_fold(config, model, split)
@@ -183,7 +196,8 @@ def run_modality_cv(
         print(
             f"[{run_name(modality, model)}] {label} ({completed}/{total}): "
             f"selection AUC {format_auc(metrics['selection_auc'])}, "
-            f"test AUC {format_auc(metrics['test_auc'])}"
+            f"test AUC {format_auc(metrics['test_auc'])}",
+            flush=True,
         )
 
     return finalize_run(run_dir)

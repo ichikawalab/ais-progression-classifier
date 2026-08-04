@@ -54,7 +54,13 @@ from ais_progression.provenance import (
     image_content_sha256,
     software_identity,
 )
-from ais_progression.utils import ensure_dir, load_json, save_json, set_seed
+from ais_progression.utils import (
+    ensure_dir,
+    load_json,
+    progress_bar_enabled,
+    save_json,
+    set_seed,
+)
 
 
 def export_image_weights(
@@ -235,7 +241,7 @@ def _train_final_model_into(
                 dataset,
                 val_df=None,
                 work_dir=work_dir / name,
-                enable_progress_bar=True,
+                enable_progress_bar=progress_bar_enabled(),
                 fixed_epochs=epochs,
             )
             artifact = f"models/{name}.pt" if weights_only else f"models/{name}.ckpt"
