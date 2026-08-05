@@ -58,11 +58,16 @@ src/ais_progression/
 
 Python 3.11-3.12 and [uv](https://docs.astral.sh/uv/).
 
-```powershell
+```bash
 git clone https://github.com/ichikawalab/ais-progression-classifier.git
 cd ais-progression-classifier
 uv sync
 ```
+
+Every command below is a single invocation with no shell-specific syntax, so it
+runs unchanged in bash, PowerShell, and `cmd.exe`. The one place that differs is
+looping over the nine models, which is spelled out for each shell where it
+appears.
 
 ### GPU training
 
@@ -71,7 +76,7 @@ ones do carry CUDA). For NVIDIA training on Windows, replace them from PyTorch's
 own index afterwards -- the CUDA variant has to match the torch version the lock
 file pins, and not every variant is published for every platform:
 
-```powershell
+```bash
 uv pip install --reinstall torch torchvision --index-url https://download.pytorch.org/whl/cu130
 ```
 
@@ -79,7 +84,7 @@ Pick the variant for your driver from the
 [official PyTorch instructions](https://pytorch.org/get-started/locally/); `cu130`
 is what torch 2.12 ships for Windows. Verify:
 
-```powershell
+```bash
 uv run python -c "import torch; print(torch.cuda.is_available(), torch.version.cuda)"
 ```
 
@@ -118,7 +123,7 @@ workbooks, re-roots the recorded absolute paths onto the local image
 directories, and maps the source `Label` column (2 = progression,
 0 = non-progression) to `label`:
 
-```powershell
+```bash
 ais-build-dataset --data-dir data --output-csv data/dataset.csv
 ```
 
@@ -138,7 +143,7 @@ CLAHE followed by zero-padding to a square canvas. Intensity normalisation with
 the ImageNet mean and standard deviation happens later, in the training
 transform.
 
-```powershell
+```bash
 ais-preprocess --dataset-csv data/dataset.csv --output-dir data/processed --output-csv data/dataset_processed.csv
 ```
 
@@ -157,7 +162,7 @@ fold (nested cross-validation).
 
 Run each of the nine individual models:
 
-```powershell
+```bash
 ais-cv-modality --modality front --model vit
 ais-cv-modality --modality front --model swint
 ais-cv-modality --modality front --model convnextv2
@@ -169,9 +174,39 @@ ais-cv-modality --modality clinical --model svm
 ais-cv-modality --modality clinical --model rf
 ```
 
-Then the ensembles, which read every completed run under `outputs/cv/`:
+The six image runs have to be sequential -- one 384-pixel backbone already fills
+a 24 GB card -- but the three clinical ones are scikit-learn and can run beside
+them in another window. To queue them in one go:
+
+```bash
+# bash
+for m in front lateral; do for k in convnextv2 vit swint; do ais-cv-modality --modality $m --model $k; done; done
+for k in logreg svm rf; do ais-cv-modality --modality clinical --model $k; done
+```
 
 ```powershell
+# PowerShell
+foreach ($m in 'front','lateral') { foreach ($k in 'convnextv2','vit','swint') { ais-cv-modality --modality $m --model $k } }
+foreach ($k in 'logreg','svm','rf') { ais-cv-modality --modality clinical --model $k }
+```
+
+```bat
+rem cmd.exe -- use %%m / %%k instead when writing this into a .bat file
+for %m in (front lateral) do for %k in (convnextv2 vit swint) do ais-cv-modality --modality %m --model %k
+for %k in (logreg svm rf) do ais-cv-modality --modality clinical --model %k
+```
+
+A model that fails -- out of memory, say -- does not stop the ones queued after
+it, so count the completed folds before moving on. Each fold writes one file
+pair, and this line needs no shell-specific quoting:
+
+```bash
+uv run python -c "import pathlib; [print(p.parent.name, len(list(p.glob('rep*_fold*.json')))) for p in sorted(pathlib.Path('outputs/cv').glob('*/folds'))]"
+```
+
+Then the ensembles, which read every completed run under `outputs/cv/`:
+
+```bash
 ais-cv-ensemble --method weighted
 ais-cv-ensemble --method average
 ais-cv-ensemble --method logreg
@@ -192,7 +227,7 @@ folds but no identity, is rejected instead of mixing results from two runs.
 To restrict the ensemble to a subset of modalities, name the base models
 explicitly:
 
-```powershell
+```bash
 ais-cv-ensemble --method weighted --base front_vit=outputs/cv/front_vit --base clinical_logreg=outputs/cv/clinical_logreg --run-dir outputs/ensemble/front_clinical
 ```
 
@@ -235,7 +270,7 @@ value. The stacking leakage itself is recorded separately.
 
 ## Final model
 
-```powershell
+```bash
 ais-train-final --bundle-dir outputs/final
 ```
 
@@ -273,7 +308,7 @@ not from rescoring the development cohort with those final weights.
 The defaults are `full` (every model), `front_clinical`, and `clinical_only`.
 Declare your own with `--profile NAME=MODALITIES`:
 
-```powershell
+```bash
 ais-train-final --profile full= --profile cheap=clinical --default-profile full
 ```
 
@@ -298,7 +333,7 @@ outputs/final/
 
 ## Prediction
 
-```powershell
+```bash
 ais-predict --bundle-dir outputs/final --input-csv data/new_cases.csv --output-csv predictions.csv
 ais-predict --bundle-dir outputs/final --list-profiles
 ais-predict --bundle-dir outputs/final --profile clinical_only --input-csv ... --output-csv ...
@@ -339,7 +374,7 @@ bundle.release()                 # drop them and free GPU memory
 
 ## Grad-CAM
 
-```powershell
+```bash
 ais-gradcam --bundle-dir outputs/final --modality front --model convnextv2 --input-csv data/dataset.csv --limit 20
 ```
 
@@ -361,7 +396,7 @@ folds only.
 
 Override anything from the command line:
 
-```powershell
+```bash
 ais-cv-modality --modality front --model vit --set train.max_epochs=50 --set data.batch_size=8 --reps 2
 ```
 
@@ -371,7 +406,7 @@ runs in fp32.
 
 ## Tests
 
-```powershell
+```bash
 uv sync --extra dev
 uv run pytest -q
 uv run ruff check .
