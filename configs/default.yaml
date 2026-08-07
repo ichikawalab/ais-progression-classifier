@@ -12,7 +12,7 @@ data:
 cross_validation:
   num_reps: 10          # repetitions of the whole 10-fold procedure
   num_folds: 10         # 1 test fold, 1 fold's worth of validation, 8 for training
-  seed: 42              # repetition r uses seed + r - 1
+  seed: 42              # outer split: seed+r-1; model seed: SeedSequence(seed,r,fold)
 
 # ===== Image models =====
 image:
@@ -69,7 +69,7 @@ ensemble:
 # Trained on the whole cohort; the epoch count comes from the cross-validation
 # runs, so there is no validation fraction to set here.
 final:
-  seed: 42
+  seed: 42              # each member derives a stable seed from this and its name
 
 # ===== Output =====
 output:

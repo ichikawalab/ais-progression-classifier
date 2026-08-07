@@ -1,12 +1,17 @@
+import warnings
+
 import numpy as np
+import optuna
 import pytest
 import torch
+from sklearn.exceptions import ConvergenceWarning
 
 from ais_progression.config import ImageConfig, TrainConfig
 from ais_progression.models.clinical_model import (
     build_preprocessor,
     fit_clinical_model,
     predict_clinical_model,
+    suggest_logreg,
 )
 from ais_progression.models.image_model import compute_balanced_class_weights
 from ais_progression.models.lightning import ImageClassifier
@@ -92,12 +97,29 @@ def test_clinical_models_fit_and_score(model, small_config, synthetic_cohort):
     _, frame = synthetic_cohort
     features = frame[small_config.clinical.features]
     labels = frame["label"].astype(int)
-    result = fit_clinical_model(features, labels, model, small_config.clinical, seed=42)
+    with warnings.catch_warnings():
+        warnings.simplefilter("error", ConvergenceWarning)
+        result = fit_clinical_model(features, labels, model, small_config.clinical, seed=42)
     probabilities = predict_clinical_model(result.pipeline, features)
     assert probabilities.shape == (len(frame),)
     assert ((probabilities >= 0) & (probabilities <= 1)).all()
     assert 0 <= result.inner_cv_auc <= 1
     assert result.best_params
+
+
+def test_logreg_search_samples_only_compatible_solver_penalty_pairs():
+    study = optuna.create_study(sampler=optuna.samplers.RandomSampler(seed=0))
+    valid = {
+        ("l1", "liblinear"),
+        ("l1", "saga"),
+        ("l2", "lbfgs"),
+        ("l2", "liblinear"),
+        ("l2", "saga"),
+        ("elasticnet", "saga"),
+    }
+    sampled = [suggest_logreg(study.ask(), 42) for _ in range(100)]
+    assert {(params["penalty"], params["solver"]) for params in sampled} <= valid
+    assert all(params["max_iter"] == 10_000 for params in sampled)
 
 
 def test_unknown_clinical_model_is_rejected(small_config, synthetic_cohort):

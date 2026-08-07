@@ -48,7 +48,7 @@ def build_arg_parser() -> argparse.ArgumentParser:
     add_data_arguments(parser)
     parser.add_argument("--reps", type=int, default=None)
     parser.add_argument("--folds", type=int, default=None)
-    parser.add_argument("--seed", type=int, default=None)
+    parser.add_argument("--seed", dest="cv_seed", type=int, default=None)
     parser.add_argument("--output-dir", default=None)
     parser.add_argument("--run-dir", default=None)
     parser.add_argument("--no-resume", action="store_true")

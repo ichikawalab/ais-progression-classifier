@@ -11,6 +11,8 @@ from typing import Any
 
 import yaml
 
+MAX_SEED = 2**32 - 1
+
 # Backbones of the reference configuration, keyed by the short name used on the CLI.
 REFERENCE_ARCHS: dict[str, str] = {
     "vit": "vit_base_patch16_384.augreg_in21k_ft_in1k",
@@ -232,6 +234,12 @@ def validate_config(config: Config) -> None:
         raise ValueError("cross_validation.num_folds must be >= 3")
     if config.cross_validation.num_reps < 1:
         raise ValueError("cross_validation.num_reps must be >= 1")
+    if not 0 <= config.cross_validation.seed <= MAX_SEED:
+        raise ValueError(f"cross_validation.seed must be in [0, {MAX_SEED}]")
+    if config.cross_validation.seed + config.cross_validation.num_reps - 1 > MAX_SEED:
+        raise ValueError("cross_validation.seed + num_reps - 1 exceeds the uint32 range")
+    if not 0 <= config.final.seed <= MAX_SEED:
+        raise ValueError(f"final.seed must be in [0, {MAX_SEED}]")
     if config.image.num_classes != 2:
         raise ValueError("This binary classifier requires image.num_classes == 2")
     if config.image.hidden_dim < 1:

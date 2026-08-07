@@ -15,7 +15,6 @@ import numpy as np
 import optuna
 import pandas as pd
 from joblib import parallel_backend
-from optuna.exceptions import TrialPruned
 from sklearn.compose import ColumnTransformer
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.impute import SimpleImputer
@@ -85,15 +84,18 @@ def build_preprocessor(clinical_cfg: ClinicalConfig, use_scaler: bool) -> Column
 
 
 def suggest_logreg(trial: optuna.Trial, seed: int) -> dict[str, Any]:
-    penalty = trial.suggest_categorical("penalty", ["l1", "l2", "elasticnet"])
-    solver = trial.suggest_categorical("solver", ["liblinear", "saga", "lbfgs"])
-    incompatible = (
-        (penalty == "l1" and solver not in {"liblinear", "saga"})
-        or (penalty == "l2" and solver not in {"lbfgs", "liblinear", "saga"})
-        or (penalty == "elasticnet" and solver != "saga")
+    pair = trial.suggest_categorical(
+        "penalty_solver",
+        [
+            "l1/liblinear",
+            "l1/saga",
+            "l2/lbfgs",
+            "l2/liblinear",
+            "l2/saga",
+            "elasticnet/saga",
+        ],
     )
-    if incompatible:
-        raise TrialPruned()
+    penalty, solver = pair.split("/", 1)
 
     params: dict[str, Any] = {
         "penalty": penalty,
@@ -102,7 +104,7 @@ def suggest_logreg(trial: optuna.Trial, seed: int) -> dict[str, Any]:
         "fit_intercept": True,
         "class_weight": trial.suggest_categorical("class_weight", [None, "balanced"]),
         "random_state": seed,
-        "max_iter": 1000,
+        "max_iter": 10000,
     }
     if penalty == "elasticnet":
         params["l1_ratio"] = trial.suggest_float("l1_ratio", 0.0, 1.0)

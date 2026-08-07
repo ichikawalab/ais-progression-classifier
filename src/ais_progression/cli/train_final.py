@@ -50,7 +50,18 @@ def build_arg_parser() -> argparse.ArgumentParser:
     parser.add_argument("--output-dir", default=None)
     parser.add_argument("--reps", type=int, default=None, help="Repetitions to read.")
     parser.add_argument("--folds", type=int, default=None)
-    parser.add_argument("--seed", type=int, default=None)
+    parser.add_argument(
+        "--cv-seed",
+        type=int,
+        default=None,
+        help="Base seed of the modality-CV runs to read.",
+    )
+    parser.add_argument(
+        "--final-seed",
+        type=int,
+        default=None,
+        help="Base seed from which each final bundle member derives its model seed.",
+    )
     parser.add_argument(
         "--cv-dir",
         default=None,

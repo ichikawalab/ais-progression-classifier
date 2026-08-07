@@ -48,7 +48,9 @@ def test_image_cross_validation_refuses_a_cpu_environment(monkeypatch, synthetic
         )
 
 
-def test_clinical_cross_validation_does_not_need_a_gpu(monkeypatch, synthetic_cohort, tmp_path):
+def test_clinical_cross_validation_does_not_need_a_gpu(
+    monkeypatch, synthetic_cohort, tmp_path, recwarn
+):
     """The clinical models are scikit-learn; refusing them would be wrong."""
     import torch
 
@@ -64,6 +66,7 @@ def test_clinical_cross_validation_does_not_need_a_gpu(monkeypatch, synthetic_co
         ]
     )
     assert (tmp_path / "clinical_logreg" / "predictions.csv").exists()
+    assert not [warning for warning in recwarn if issubclass(warning.category, RuntimeWarning)]
 
 
 def test_final_training_refuses_a_cpu_environment(monkeypatch, synthetic_cohort):

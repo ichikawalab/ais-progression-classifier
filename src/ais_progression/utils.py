@@ -15,6 +15,25 @@ import numpy as np
 import torch
 
 
+def derive_seed(base_seed: int, *coordinates: int | str) -> int:
+    """Derive a stable uint32 seed from an experiment seed and its coordinates."""
+    if base_seed < 0:
+        raise ValueError("base_seed must be non-negative")
+    entropy = [base_seed]
+    for coordinate in coordinates:
+        if isinstance(coordinate, int):
+            if coordinate < 0:
+                raise ValueError("seed coordinates must be non-negative")
+            entropy.append(coordinate)
+            continue
+        digest = hashlib.sha256(coordinate.encode("utf-8")).digest()
+        entropy.extend(
+            int.from_bytes(digest[offset : offset + 4], "big")
+            for offset in range(0, len(digest), 4)
+        )
+    return int(np.random.SeedSequence(entropy).generate_state(1, dtype=np.uint32)[0])
+
+
 def set_seed(seed: int, deterministic: bool = True) -> None:
     """Seed Python, NumPy and torch, and optionally pin deterministic kernels."""
     import random

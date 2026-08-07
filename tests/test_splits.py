@@ -21,13 +21,16 @@ def test_fold_seed_is_distinct_for_every_fold_of_every_repetition():
 
     # Two folds of the same repetition must not share a seed.
     assert fold_seed(42, 1, 1) != fold_seed(42, 1, 2)
-    # Nor may a repetition's range run into the next one's.
-    assert fold_seed(42, 1, 10) < fold_seed(42, 2, 1)
+    assert all(0 <= seed <= 2**32 - 1 for seed in seeds)
 
 
 def test_fold_seed_depends_only_on_the_fold_not_on_execution_order():
     """The same fold reseeds identically however many folds ran before it."""
     assert fold_seed(42, 3, 7) == fold_seed(42, 3, 7)
+
+
+def test_large_valid_base_seed_still_produces_a_uint32_fold_seed():
+    assert 0 <= fold_seed(5_000_000, 1, 1) <= 2**32 - 1
 
 
 def test_every_patient_is_tested_exactly_once_per_repetition(synthetic_cohort):
@@ -59,6 +62,8 @@ def test_validation_slice_is_one_folds_worth(synthetic_cohort):
     split = next(iter_folds(frame, num_reps=1, num_folds=4, base_seed=42))
     # One fold is held out for test; the validation slice is 1/(folds-1) of the rest.
     assert split.sizes["n_val"] == pytest.approx(len(frame) / 4, abs=1)
+    assert split.split_seed == rep_seed(42, 1)
+    assert split.model_seed == fold_seed(42, 1, 1)
 
 
 def test_without_validation_the_training_fold_is_whole(synthetic_cohort):

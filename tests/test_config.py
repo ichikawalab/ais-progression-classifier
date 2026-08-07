@@ -1,5 +1,7 @@
 import pytest
 
+from ais_progression.cli._common import build_config
+from ais_progression.cli.train_final import build_arg_parser as build_final_parser
 from ais_progression.config import (
     REFERENCE_ARCHS,
     Config,
@@ -65,6 +67,8 @@ def test_resolve_arch_rejects_unknown_model():
         lambda c: setattr(c.image, "dropout", 1.0),
         lambda c: setattr(c.train, "matmul_precision", "turbo"),
         lambda c: setattr(c.cross_validation, "num_folds", 2),
+        lambda c: setattr(c.cross_validation, "seed", -1),
+        lambda c: setattr(c.final, "seed", 2**32),
         lambda c: setattr(c.train, "warmup_epochs", 0),
     ],
 )
@@ -95,6 +99,13 @@ def test_parse_set_args_types():
 def test_parse_set_args_rejects_missing_equals():
     with pytest.raises(ValueError, match="expected key=value"):
         parse_set_args(["train.lr"])
+
+
+def test_final_cli_separates_cv_and_final_seeds():
+    args = build_final_parser().parse_args(["--cv-seed", "123", "--final-seed", "456"])
+    config = build_config(args)
+    assert config.cross_validation.seed == 123
+    assert config.final.seed == 456
 
 
 def test_config_round_trips_through_yaml(tmp_path):

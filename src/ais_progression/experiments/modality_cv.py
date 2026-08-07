@@ -73,7 +73,8 @@ def _run_image_fold(
     metrics = {
         "rep": split.rep,
         "fold": split.fold,
-        "seed": split.seed,
+        "split_seed": split.split_seed,
+        "model_seed": split.model_seed,
         **split.sizes,
         # The AUC that drove model selection. For an image model that is the
         # held-out validation slice; see selection_auc_source.
@@ -94,7 +95,7 @@ def _run_clinical_fold(config: Config, model: str, split: Fold) -> tuple[pd.Data
         split.train[LABEL_COLUMN].astype(int),
         model,
         config.clinical,
-        split.seed,
+        split.model_seed,
     )
     probabilities = predict_clinical_model(fit.pipeline, split.test[features])
     predictions = make_predictions_frame(
@@ -108,7 +109,8 @@ def _run_clinical_fold(config: Config, model: str, split: Fold) -> tuple[pd.Data
     metrics = {
         "rep": split.rep,
         "fold": split.fold,
-        "seed": split.seed,
+        "split_seed": split.split_seed,
+        "model_seed": split.model_seed,
         **split.sizes,
         # Clinical models tune with an inner cross-validation over the whole
         # outer training fold, so their selection AUC is that inner score --
@@ -135,16 +137,10 @@ def run_modality_cv(
     Completed folds are skipped when ``resume`` is set, so an interrupted run can
     be restarted with the same command.
 
-    Note on seeding: the earlier implementation seeded once per repetition and
-    let the RNG carry across that repetition's folds, so a fold's result depended
-    on every fold that ran before it -- and therefore on where a run happened to
-    be interrupted. Here every fold is reseeded from ``fold_seed(base, rep,
-    fold)``, which is reproducible on its own (the precondition for resuming) and
-    still differs between the folds of a repetition (so they are not all launched
-    from one RNG state). Fold assignment is untouched: that stays keyed on the
-    repetition, because a repetition's folds must partition the same cohort.
-    What differs from the original is weight initialisation, augmentation draws,
-    and the clinical models' Optuna sampler.
+    The outer partition is seeded per repetition. Each fold has a separately
+    derived uint32 model seed for its validation slice, initialisation,
+    augmentation, inner cross-validation, and Optuna sampler. A fold therefore
+    reproduces independently of execution order or interruption history.
     """
     run_dir = Path(run_dir)
     folds_dir = run_dir / "folds"
@@ -184,7 +180,7 @@ def run_modality_cv(
             f"[{run_name(modality, model)}] {label} ({completed}/{total}): training",
             flush=True,
         )
-        set_seed(split.seed, deterministic=config.train.deterministic)
+        set_seed(split.model_seed, deterministic=config.train.deterministic)
         if is_clinical:
             predictions, metrics = _run_clinical_fold(config, model, split)
         else:

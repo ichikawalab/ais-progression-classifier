@@ -153,12 +153,17 @@ data with a validated local workflow first.
 
 ## Cross-validation
 
-Repeated stratified 10-fold cross-validation, 10 repetitions, seeded 42 + r - 1.
+Repeated stratified 10-fold cross-validation with 10 repetitions. The outer
+partition for repetition `r` uses `42 + r - 1`. Each fold then receives a stable
+uint32 model seed derived with NumPy `SeedSequence` from `(42, repetition,
+fold)`; that seed drives its validation slice, image initialisation and
+augmentation, inner cross-validation, and Optuna sampler. Consequently a fold
+has the same result whether run continuously, resumed, or scheduled alone.
 Within each repetition one fold is held out for test. Image models carve a
 stratified 1/9 slice out of the remaining folds for early stopping, leaving
 eight folds' worth of training data. Clinical and ensemble models instead tune
 with an inner stratified 10-fold Optuna search over the whole outer training
-fold (nested cross-validation).
+fold (nested cross-validation). Both seeds are recorded in every fold's JSON.
 
 Run each of the nine individual models:
 
@@ -311,6 +316,10 @@ Declare your own with `--profile NAME=MODALITIES`:
 ```bash
 ais-train-final --profile full= --profile cheap=clinical --default-profile full
 ```
+
+Use `--cv-seed` to identify CV runs made with a non-default split seed, and
+`--final-seed` to change the independent seed from which final bundle members
+derive their model-specific seeds.
 
 The decision threshold is the median Youden threshold across repetitions. Pass
 `--threshold-policy target_sensitivity --target-sensitivity 0.9` to choose the

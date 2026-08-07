@@ -12,21 +12,22 @@ import pandas as pd
 from sklearn.model_selection import StratifiedKFold, train_test_split
 
 from ais_progression.data.schema import ID_COLUMN, LABEL_COLUMN
+from ais_progression.utils import derive_seed
 
 
 @dataclass
 class Fold:
     """One outer fold: train / validation / test frames plus their indices.
 
-    ``seed`` is this fold's own seed, for whatever a model fitted on it needs to
-    draw -- an Optuna sampler, an inner K-fold. It is deliberately *not* the seed
-    that produced the split: that one is keyed on the repetition alone, because
-    every fold of a repetition has to come from the same partition of the cohort.
+    ``split_seed`` produces the repetition's outer partition. ``model_seed`` is
+    unique to this fold and drives model initialisation, augmentation, Optuna,
+    inner cross-validation, and the image-model validation slice.
     """
 
     rep: int
     fold: int
-    seed: int
+    split_seed: int
+    model_seed: int
     train: pd.DataFrame
     val: pd.DataFrame
     test: pd.DataFrame
@@ -49,11 +50,10 @@ def fold_seed(base_seed: int, rep: int, fold: int) -> int:
     process -- the precondition for resuming a run fold by fold. Keying only on
     ``rep`` met that requirement but left every fold of a repetition starting
     from the identical RNG state, correlating them; keying on both ``rep`` and
-    ``fold`` removes that correlation as well. ``fold`` is 1-based and bounded
-    by ``num_folds``, so 1000 leaves no realistic collision with the next rep's
-    seed range.
+    ``fold`` removes that correlation as well. ``SeedSequence`` produces a
+    stable uint32 value accepted by NumPy, torch, and scikit-learn.
     """
-    return rep_seed(base_seed, rep) * 1000 + fold
+    return derive_seed(base_seed, rep, fold)
 
 
 def assert_no_leakage(*frames: pd.DataFrame) -> None:
@@ -108,12 +108,13 @@ def iter_folds(
         split_seed = rep_seed(base_seed, rep)
         splitter = StratifiedKFold(n_splits=num_folds, shuffle=True, random_state=split_seed)
         for fold, (train_val_idx, test_idx) in enumerate(splitter.split(df, labels), start=1):
+            model_seed = fold_seed(base_seed, rep, fold)
             if with_validation:
                 train_idx, val_idx = train_test_split(
                     train_val_idx,
                     test_size=val_fraction,
                     stratify=labels.iloc[train_val_idx],
-                    random_state=split_seed,
+                    random_state=model_seed,
                 )
             else:
                 train_idx, val_idx = train_val_idx, []
@@ -125,7 +126,8 @@ def iter_folds(
             yield Fold(
                 rep=rep,
                 fold=fold,
-                seed=fold_seed(base_seed, rep, fold),
+                split_seed=split_seed,
+                model_seed=model_seed,
                 train=train,
                 val=val,
                 test=test,

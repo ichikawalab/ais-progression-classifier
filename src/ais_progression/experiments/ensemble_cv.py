@@ -238,7 +238,7 @@ def _run_ensemble_fold(
     y_test = split.test[LABEL_COLUMN].astype(int)
 
     probabilities, val_auc, val_source, extra = _fit_and_predict(
-        method, X_train, y_train, X_test, config, split.seed
+        method, X_train, y_train, X_test, config, split.model_seed
     )
     predictions = make_predictions_frame(
         test_ids, y_test, probabilities.to_numpy(), split.rep, split.fold, "test"
@@ -246,7 +246,8 @@ def _run_ensemble_fold(
     metrics = {
         "rep": split.rep,
         "fold": split.fold,
-        "seed": split.seed,
+        "split_seed": split.split_seed,
+        "model_seed": split.model_seed,
         **split.sizes,
         "selection_auc": val_auc,
         "selection_auc_source": val_source,
@@ -325,7 +326,7 @@ def run_ensemble_cv(
             print(f"[ensemble/{method}] {label}: already done, skipping")
             continue
 
-        set_seed(split.seed, deterministic=False)
+        set_seed(split.model_seed, deterministic=False)
         predictions, metrics = _run_ensemble_fold(config, method, matrices[split.rep], split)
         write_fold(folds_dir, split.rep, split.fold, predictions, metrics)
         print(

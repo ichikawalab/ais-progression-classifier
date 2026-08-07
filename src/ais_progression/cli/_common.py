@@ -30,14 +30,20 @@ def add_data_arguments(parser: argparse.ArgumentParser) -> None:
 
 def build_config(args: argparse.Namespace) -> Config:
     """Assemble the configuration from the YAML file plus the parsed flags."""
-    overrides: dict[str, dict] = {"data": {}, "cross_validation": {}, "output": {}}
+    overrides: dict[str, dict] = {
+        "data": {},
+        "cross_validation": {},
+        "final": {},
+        "output": {},
+    }
     mappings = (
         ("data", "csv_path", getattr(args, "dataset_csv", None)),
         ("data", "batch_size", getattr(args, "batch_size", None)),
         ("data", "num_workers", getattr(args, "num_workers", None)),
         ("cross_validation", "num_reps", getattr(args, "reps", None)),
         ("cross_validation", "num_folds", getattr(args, "folds", None)),
-        ("cross_validation", "seed", getattr(args, "seed", None)),
+        ("cross_validation", "seed", getattr(args, "cv_seed", None)),
+        ("final", "seed", getattr(args, "final_seed", None)),
         ("output", "dir", getattr(args, "output_dir", None)),
     )
     for section, key, value in mappings:

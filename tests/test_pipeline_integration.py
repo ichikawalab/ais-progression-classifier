@@ -27,6 +27,7 @@ from ais_progression.final.train import (
     train_final_model,
     validate_cv_compatibility,
 )
+from ais_progression.utils import derive_seed
 
 TINY_ARCH = "resnet18"
 
@@ -270,6 +271,10 @@ def test_final_model_trains_on_everything_and_serves_profiles(
     assert metrics["n_train"] == len(dataset)
     assert all(
         "final_train_loss" not in report for report in metrics["training"].values()
+    )
+    assert all(
+        report["model_seed"] == derive_seed(config.final.seed, name)
+        for name, report in metrics["training"].items()
     )
     assert not (bundle_dir / "_work").exists()
 

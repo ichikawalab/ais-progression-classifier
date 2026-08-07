@@ -56,7 +56,9 @@ def build_arg_parser() -> argparse.ArgumentParser:
     add_data_arguments(parser)
     parser.add_argument("--reps", type=int, default=None, help="Repetitions (default 10).")
     parser.add_argument("--folds", type=int, default=None, help="Outer folds (default 10).")
-    parser.add_argument("--seed", type=int, default=None, help="Base seed (default 42).")
+    parser.add_argument(
+        "--seed", dest="cv_seed", type=int, default=None, help="Base seed (default 42)."
+    )
     parser.add_argument("--output-dir", default=None, help="Root output directory.")
     parser.add_argument("--run-dir", default=None, help="Override the run directory.")
     parser.add_argument(
@@ -95,7 +97,8 @@ def main(argv: list[str] | None = None) -> None:
         required_clinical_features=() if needs_images else config.clinical.features,
         check_files=needs_images,
     )
-    warn_if_not_reproducible(config.train.precision, config.train.deterministic)
+    if needs_images:
+        warn_if_not_reproducible(config.train.precision, config.train.deterministic)
 
     run_dir = Path(
         args.run_dir or Path(config.output.dir) / "cv" / run_name(args.modality, args.model)

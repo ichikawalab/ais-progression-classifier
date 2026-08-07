@@ -55,6 +55,7 @@ from ais_progression.provenance import (
     software_identity,
 )
 from ais_progression.utils import (
+    derive_seed,
     ensure_dir,
     load_json,
     progress_bar_enabled,
@@ -222,7 +223,6 @@ def _train_final_model_into(
     required = validate_plan(config, profiles, image_models, clinical_models, image_modalities)
     print(f"Training {len(required)} model(s) on all {len(dataset)} patients")
 
-    set_seed(config.final.seed, deterministic=config.train.deterministic)
     members: list[BundleMember] = []
     training_report: dict[str, dict] = {}
 
@@ -233,6 +233,8 @@ def _train_final_model_into(
                 continue
             arch = resolve_arch(config, model)
             epochs = epoch_plan[name]
+            model_seed = derive_seed(config.final.seed, name)
+            set_seed(model_seed, deterministic=config.train.deterministic)
             print(f"Training {name} ({arch}) for {epochs} epoch(s)")
             fit = fit_image_model(
                 config,
@@ -251,6 +253,7 @@ def _train_final_model_into(
             )
             training_report[name] = {
                 "epochs": epochs,
+                "model_seed": model_seed,
                 "class_weights": fit.class_weights,
             }
 
@@ -259,12 +262,13 @@ def _train_final_model_into(
         if name not in required:
             continue
         print(f"Training {name}")
+        model_seed = derive_seed(config.final.seed, name)
         fit = fit_clinical_model(
             dataset[CLINICAL_COLUMNS],
             dataset[LABEL_COLUMN].astype(int),
             model,
             config.clinical,
-            config.final.seed,
+            model_seed,
         )
         artifact = f"models/{name}.joblib"
         joblib.dump(fit.pipeline, bundle_dir / artifact)
@@ -273,7 +277,10 @@ def _train_final_model_into(
         # AUC is a post-selection score over the whole cohort, so keeping it here
         # would put a number in metrics.json that looks like performance but is
         # not the profile's out-of-fold estimate.
-        training_report[name] = {"best_params": fit.best_params}
+        training_report[name] = {
+            "model_seed": model_seed,
+            "best_params": fit.best_params,
+        }
 
     profile_entries = []
     for profile in profiles:
