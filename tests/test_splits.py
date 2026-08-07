@@ -1,11 +1,33 @@
 import pytest
 
-from ais_progression.experiments.splits import assert_no_leakage, iter_folds, rep_seed
+from ais_progression.experiments.splits import (
+    assert_no_leakage,
+    fold_seed,
+    iter_folds,
+    rep_seed,
+)
 
 
 def test_rep_seed_starts_at_the_base_seed():
     assert rep_seed(42, 1) == 42
     assert rep_seed(42, 10) == 51
+
+
+def test_fold_seed_is_distinct_for_every_fold_of_every_repetition():
+    """Reseeding per fold makes resume exact; keying on the fold keeps the folds
+    of one repetition from all starting at the identical RNG state."""
+    seeds = [fold_seed(42, rep, fold) for rep in range(1, 11) for fold in range(1, 11)]
+    assert len(set(seeds)) == 100
+
+    # Two folds of the same repetition must not share a seed.
+    assert fold_seed(42, 1, 1) != fold_seed(42, 1, 2)
+    # Nor may a repetition's range run into the next one's.
+    assert fold_seed(42, 1, 10) < fold_seed(42, 2, 1)
+
+
+def test_fold_seed_depends_only_on_the_fold_not_on_execution_order():
+    """The same fold reseeds identically however many folds ran before it."""
+    assert fold_seed(42, 3, 7) == fold_seed(42, 3, 7)
 
 
 def test_every_patient_is_tested_exactly_once_per_repetition(synthetic_cohort):

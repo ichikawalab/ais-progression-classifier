@@ -60,7 +60,7 @@ def test_clinical_cross_validation_does_not_need_a_gpu(monkeypatch, synthetic_co
             "--dataset-csv", str(csv_path),
             "--run-dir", str(tmp_path / "clinical_logreg"),
             "--reps", "1", "--folds", "3",
-            "--set", "clinical.n_trials=2", "--set", "clinical.inner_folds=2",
+            "--set", "clinical.n_trials=6", "--set", "clinical.inner_folds=2",
         ]
     )
     assert (tmp_path / "clinical_logreg" / "predictions.csv").exists()

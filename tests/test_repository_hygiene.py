@@ -85,11 +85,13 @@ def test_no_training_artifacts_were_left_in_the_repository_root():
     Lightning silently creates <cwd>/checkpoints and <cwd>/lightning_logs unless
     checkpointing and logging are switched off, which dumps hundreds of
     megabytes wherever the command happened to be run.
+
+    ``logs/`` is not on this list: .gitignore reserves it, and it is where a
+    caller redirecting a long run's stderr would reasonably put it. The point
+    here is what training writes *without being asked*.
     """
     strays = [
-        name
-        for name in ("checkpoints", "lightning_logs", "logs")
-        if (REPO_ROOT / name).exists()
+        name for name in ("checkpoints", "lightning_logs") if (REPO_ROOT / name).exists()
     ]
     assert not strays, f"Training left artefacts in the repository root: {strays}"
 

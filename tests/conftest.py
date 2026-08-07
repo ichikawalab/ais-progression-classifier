@@ -65,9 +65,13 @@ def small_config(tmp_path):
             "data.batch_size": 4,
             "cross_validation.num_reps": 2,
             "cross_validation.num_folds": 4,
-            "clinical.n_trials": 2,
+            # Enough trials that a fold cannot see every one of them pruned.
+            # The logistic-regression space prunes incompatible penalty/solver
+            # pairs -- a third of the grid -- so two trials fail outright about
+            # one seed in nine, and folds now each draw their own seed.
+            "clinical.n_trials": 6,
             "clinical.inner_folds": 3,
-            "ensemble.n_trials": 3,
+            "ensemble.n_trials": 6,
             "ensemble.inner_folds": 3,
             "train.max_epochs": 1,
             "train.min_epochs": 1,

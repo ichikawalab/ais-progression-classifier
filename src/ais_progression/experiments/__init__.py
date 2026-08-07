@@ -6,12 +6,13 @@ from ais_progression.experiments.ensemble_cv import (
 )
 from ais_progression.experiments.modality_cv import run_modality_cv, run_name
 from ais_progression.experiments.reporting import finalize_run, summarize_run
-from ais_progression.experiments.splits import Fold, iter_folds, rep_seed
+from ais_progression.experiments.splits import Fold, fold_seed, iter_folds, rep_seed
 
 __all__ = [
     "Fold",
     "build_oof_matrix",
     "finalize_run",
+    "fold_seed",
     "iter_folds",
     "load_base_predictions",
     "rep_seed",

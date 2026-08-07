@@ -41,7 +41,7 @@ from ais_progression.experiments.reporting import (
     fold_is_complete,
     write_fold,
 )
-from ais_progression.experiments.splits import Fold, iter_folds, rep_seed
+from ais_progression.experiments.splits import Fold, iter_folds
 from ais_progression.provenance import frame_sha256, software_identity
 from ais_progression.utils import save_json, set_seed
 
@@ -325,7 +325,7 @@ def run_ensemble_cv(
             print(f"[ensemble/{method}] {label}: already done, skipping")
             continue
 
-        set_seed(rep_seed(cv.seed, split.rep), deterministic=False)
+        set_seed(split.seed, deterministic=False)
         predictions, metrics = _run_ensemble_fold(config, method, matrices[split.rep], split)
         write_fold(folds_dir, split.rep, split.fold, predictions, metrics)
         print(

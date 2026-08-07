@@ -24,7 +24,7 @@ from ais_progression.experiments.reporting import (
     fold_is_complete,
     write_fold,
 )
-from ais_progression.experiments.splits import Fold, iter_folds, rep_seed
+from ais_progression.experiments.splits import Fold, iter_folds
 from ais_progression.models.clinical_model import fit_clinical_model, predict_clinical_model
 from ais_progression.models.image_model import (
     discard_checkpoints,
@@ -135,12 +135,16 @@ def run_modality_cv(
     Completed folds are skipped when ``resume`` is set, so an interrupted run can
     be restarted with the same command.
 
-    Note on seeding: the earlier implementation seeded once per repetition and let the
-    RNG carry across that repetition's folds, so a fold's result depended on
-    every fold before it. Here each fold is re-seeded with its repetition's seed,
-    which makes a fold reproducible on its own -- the precondition for resuming.
-    Fold assignment is unaffected; only weight initialisation and augmentation
-    draws differ from the original.
+    Note on seeding: the earlier implementation seeded once per repetition and
+    let the RNG carry across that repetition's folds, so a fold's result depended
+    on every fold that ran before it -- and therefore on where a run happened to
+    be interrupted. Here every fold is reseeded from ``fold_seed(base, rep,
+    fold)``, which is reproducible on its own (the precondition for resuming) and
+    still differs between the folds of a repetition (so they are not all launched
+    from one RNG state). Fold assignment is untouched: that stays keyed on the
+    repetition, because a repetition's folds must partition the same cohort.
+    What differs from the original is weight initialisation, augmentation draws,
+    and the clinical models' Optuna sampler.
     """
     run_dir = Path(run_dir)
     folds_dir = run_dir / "folds"
@@ -180,7 +184,7 @@ def run_modality_cv(
             f"[{run_name(modality, model)}] {label} ({completed}/{total}): training",
             flush=True,
         )
-        set_seed(rep_seed(cv.seed, split.rep), deterministic=config.train.deterministic)
+        set_seed(split.seed, deterministic=config.train.deterministic)
         if is_clinical:
             predictions, metrics = _run_clinical_fold(config, model, split)
         else:
