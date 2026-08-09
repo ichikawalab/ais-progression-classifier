@@ -13,6 +13,10 @@ DATA_EXTENSIONS = {
     ".png", ".jpg", ".jpeg", ".dcm", ".nii", ".xlsx", ".xls", ".ckpt", ".pt", ".joblib",
 }
 ALLOWED_CSV_DIRS = {"examples"}
+README_EXEMPT_ENTRY_POINTS = {
+    # Converts the study's original workbooks and is not part of the public workflow.
+    "ais-build-dataset",
+}
 
 
 def tracked_files() -> list[Path]:
@@ -64,7 +68,7 @@ def test_every_entry_point_imports_and_parses_arguments(command, target):
 
 def test_documented_commands_exist():
     readme = (REPO_ROOT / "README.md").read_text(encoding="utf-8")
-    for command in _entry_points():
+    for command in _entry_points().keys() - README_EXEMPT_ENTRY_POINTS:
         assert command in readme, f"{command} is not documented in the README"
 
 

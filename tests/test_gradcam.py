@@ -9,6 +9,7 @@ from __future__ import annotations
 import pytest
 import torch
 
+from ais_progression.cli.gradcam import build_arg_parser
 from ais_progression.config import ImageConfig, TrainConfig, load_config
 from ais_progression.gradcam import generate_gradcam, resolve_target_layer
 from ais_progression.models.lightning import ImageClassifier
@@ -19,6 +20,22 @@ FAMILY_ARCHS = {
     "swint": "swin_tiny_patch4_window7_224",
     "convnextv2": "convnextv2_atto",
 }
+
+
+def test_cli_defaults_to_progression_class():
+    args = build_arg_parser().parse_args(
+        [
+            "--bundle-dir",
+            "bundle",
+            "--modality",
+            "front",
+            "--model",
+            "vit",
+            "--input-csv",
+            "patients.csv",
+        ]
+    )
+    assert args.target_class == "1"
 
 
 def _classifier(arch: str) -> ImageClassifier:

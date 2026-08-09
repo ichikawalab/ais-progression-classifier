@@ -71,7 +71,7 @@ commands below call the active environment directly.
 
 ## Data format
 
-Everything downstream reads a single patient-level CSV:
+The `full` profile reads a patient-level CSV with these columns:
 
 ```csv
 patient_id,front_path,lateral_path,age,sex,risser,cobb_baseline,label
@@ -86,6 +86,8 @@ case002,front/case002.png,lateral/case002.png,13.8,2,4,22.5,0
 * `risser` - Risser sign 0-5, treated as ordinal
 * `cobb_baseline` - baseline Cobb angle in degrees
 * `label` - 0 non-progression (<=5 deg), 1 progression (>=10 deg)
+
+Profiles that do not use an image modality may omit its path column.
 
 Borderline patients (6-9 deg) are excluded before this file is built. See
 [examples/sample_dataset.csv](examples/sample_dataset.csv).
@@ -155,63 +157,64 @@ ais-train-final --bundle-dir outputs\final
 This trains the required models on the entire input cohort. Image models use the
 median epoch count from cross-validation.
 
-### Serving profiles
-
-A bundle can carry several model combinations. Each profile has its own weights,
-threshold, calibrator, and cross-validated AUC derived from out-of-fold
-predictions. Adding profiles does not repeat image training.
-
-The defaults are `full` (every model), `front_clinical`, and `clinical_only`.
-Declare your own with `--profile NAME=MODALITIES`:
-
-```cmd
-ais-train-final --profile full= --profile cheap=clinical --default-profile full
-```
-
-The default decision threshold uses the median Youden threshold across
-repetitions. Use `--threshold-policy target_sensitivity --target-sensitivity
-0.9` to target sensitivity. Isotonic calibration is the default; alternatives
-are `--calibration platt|none`.
+Prediction requires a trained bundle. Model weights are not included in this
+repository; create a bundle with the command above or use one supplied by a
+trusted source.
 
 ## Prediction
 
+The bundle provides three input profiles:
+
+| Profile | Required input | Models |
+| --- | --- | --- |
+| `full` (default) | Frontal image, lateral image, clinical variables | All 9 models |
+| `front_clinical` | Frontal image, clinical variables | 6 models |
+| `clinical_only` | Clinical variables | 3 models |
+
+List the profiles stored in a bundle:
+
 ```cmd
-ais-predict --bundle-dir outputs\final --input-csv data\new_cases.csv --output-csv predictions.csv
 ais-predict --bundle-dir outputs\final --list-profiles
-ais-predict --bundle-dir outputs\final --profile clinical_only --input-csv data\new_cases.csv --output-csv predictions.csv
 ```
 
-The input CSV needs only the fields used by the selected profile: for example,
-`clinical_only` needs no image paths, while a front-only profile needs neither
-the lateral path nor clinical variables. `patient_id` is always required and
-`label` is optional; when present, AUC is reported. Output holds one column per
-base model plus `probability`, `calibrated_probability`,
-`predicted_label`, `threshold`, `profile`, and `imputed_fields`.
+For `full`, first preprocess the new radiographs:
 
-Missing clinical variables are **rejected by default**: imputing them silently
-would return a confident-looking probability built partly from training medians.
-Pass `--allow-missing` to impute anyway, and the affected fields are named in
-`imputed_fields`. Values outside plausible ranges (see `FEATURE_BOUNDS` in
-`data/schema.py`) are always rejected.
-
-New images must be preprocessed the same way as training, including the square
-padding from `ais-preprocess` -- non-square inputs are distorted on resize.
-Loading a bundle unpickles scikit-learn pipelines, so only load bundles from a
-run you trust.
-
-### Serving from an application
-
-`ModelBundle` caches models after their first use, so an application pays the
-load cost once rather than per request:
-
-```python
-from ais_progression.final import ModelBundle
-
-bundle = ModelBundle.load("outputs/final")
-bundle.warmup("full")            # load the weights at startup
-result = bundle.predict(frame)   # subsequent calls reuse them
-bundle.release()                 # drop them and free GPU memory
+```cmd
+ais-preprocess --dataset-csv data\new_cases.csv --output-dir data\new_cases_processed --output-csv data\new_cases_processed.csv
 ```
+
+For `front_clinical`, add `--modalities front`; `clinical_only` requires no
+image preprocessing.
+
+Then run the default `full` profile:
+
+```cmd
+ais-predict --bundle-dir outputs\final --input-csv data\new_cases_processed.csv --output-csv outputs\predictions.csv
+```
+
+Clinical-only prediction does not require images or preprocessing:
+
+```cmd
+ais-predict --bundle-dir outputs\final --profile clinical_only --input-csv data\new_clinical_cases.csv --output-csv outputs\clinical_predictions.csv
+```
+
+`patient_id` is always required and `label` is optional. When labels are
+present, AUC is reported. Missing or out-of-range clinical values are rejected.
+Do not preprocess an image more than once because CLAHE is not idempotent.
+
+The main output columns are:
+
+| Column | Meaning |
+| --- | --- |
+| `probability` | Raw weighted-ensemble score used for classification |
+| `calibrated_probability` | Internally calibrated reference probability |
+| `predicted_label` | Binary prediction from `probability` and the profile threshold |
+| `threshold` | Threshold used for `predicted_label` |
+| `profile` | Profile used for prediction |
+
+`calibrated_probability` has not been externally validated as a clinical risk
+estimate. Loading a bundle unpickles scikit-learn pipelines, so only use a
+bundle from a trusted source.
 
 ## Grad-CAM
 
@@ -219,8 +222,10 @@ bundle.release()                 # drop them and free GPU memory
 ais-gradcam --bundle-dir outputs\final --modality front --model convnextv2 --input-csv data\dataset.csv --limit 20
 ```
 
-Grad-CAM supports the configured ViT, Swin, and ConvNeXtV2 backbones. It is
-exploratory and does not establish a causal explanation for a prediction.
+Grad-CAM supports the configured ViT, Swin, and ConvNeXtV2 backbones. It targets
+progression class (`--target-class 1`) by default; use `--target-class pred` to
+visualise each model's predicted class. Grad-CAM is exploratory and does not
+establish a causal explanation for a prediction.
 
 ## Configuration
 

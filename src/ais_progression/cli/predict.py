@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import argparse
+import json
 from pathlib import Path
 
 import pandas as pd
@@ -13,7 +14,6 @@ from ais_progression.data.schema import (
     missing_feature_report,
 )
 from ais_progression.evaluation import binary_metrics, format_auc, safe_auc
-from ais_progression.final.bundle import ModelBundle
 
 
 def build_arg_parser() -> argparse.ArgumentParser:
@@ -25,8 +25,8 @@ def build_arg_parser() -> argparse.ArgumentParser:
         )
     )
     parser.add_argument("--bundle-dir", required=True)
-    parser.add_argument("--input-csv", required=True)
-    parser.add_argument("--output-csv", required=True)
+    parser.add_argument("--input-csv")
+    parser.add_argument("--output-csv")
     parser.add_argument(
         "--profile",
         default=None,
@@ -55,28 +55,46 @@ def build_arg_parser() -> argparse.ArgumentParser:
     return parser
 
 
-def _print_profiles(bundle: ModelBundle) -> None:
-    default = bundle.manifest.get("default_profile")
-    for name, profile in sorted(bundle.profiles.items()):
+def _load_manifest(bundle_dir: str | Path) -> dict:
+    path = Path(bundle_dir) / "manifest.json"
+    if not path.is_file():
+        raise SystemExit(f"Model bundle manifest not found: {path}")
+    with path.open(encoding="utf-8") as handle:
+        return json.load(handle)
+
+
+def _print_profiles(manifest: dict) -> None:
+    default = manifest.get("default_profile")
+    profiles = sorted(manifest.get("profiles", []), key=lambda profile: profile["name"])
+    for profile in profiles:
+        name = profile["name"]
         marker = " (default)" if name == default else ""
-        cv = profile.cv_metrics
+        cv = profile.get("cv_metrics", {})
         auc = "n/a" if cv.get("auc_mean") is None else f"{cv['auc_mean']:.3f}"
+        threshold = profile["operating_point"]["threshold"]
+        members = profile["members"]
         print(
-            f"{name}{marker}: {len(profile.members)} model(s), CV AUC {auc}, "
-            f"threshold {profile.operating_point.threshold:.3f}"
+            f"{name}{marker}: {len(members)} model(s), CV AUC {auc}, "
+            f"threshold {threshold:.3f}"
         )
-        print(f"    {', '.join(profile.members)}")
+        print(f"    {', '.join(members)}")
 
 
 def main(argv: list[str] | None = None) -> None:
-    args = build_arg_parser().parse_args(argv)
+    parser = build_arg_parser()
+    args = parser.parse_args(argv)
     if args.threshold is not None and not 0 <= args.threshold <= 1:
         raise SystemExit("--threshold must be in [0, 1]")
 
-    bundle = ModelBundle.load(args.bundle_dir)
     if args.list_profiles:
-        _print_profiles(bundle)
+        _print_profiles(_load_manifest(args.bundle_dir))
         return
+    if not args.input_csv or not args.output_csv:
+        parser.error("--input-csv and --output-csv are required for prediction")
+
+    from ais_progression.final.bundle import ModelBundle
+
+    bundle = ModelBundle.load(args.bundle_dir)
 
     if args.batch_size is not None:
         bundle.config.data.batch_size = args.batch_size

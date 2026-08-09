@@ -23,7 +23,13 @@ def build_arg_parser() -> argparse.ArgumentParser:
     parser.add_argument("--model", required=True, help="Image model name, e.g. convnextv2.")
     parser.add_argument("--input-csv", required=True, help="Patients to visualise.")
     parser.add_argument("--output-dir", default=None)
-    parser.add_argument("--target-class", choices=("pred", "0", "1"), default="pred")
+    parser.add_argument(
+        "--target-class",
+        choices=("pred", "0", "1"),
+        default="1",
+        help="Class to visualise: progression (1, default), non-progression (0), "
+        "or each model's predicted class (pred).",
+    )
     parser.add_argument("--alpha", type=float, default=0.5, help="Heatmap opacity.")
     parser.add_argument("--limit", type=int, default=None, help="Only the first N patients.")
     return parser

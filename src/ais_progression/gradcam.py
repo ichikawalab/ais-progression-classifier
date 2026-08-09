@@ -79,7 +79,7 @@ def generate_gradcam(
     modality: str,
     df: pd.DataFrame,
     output_dir: str | Path,
-    target_class: str = "pred",
+    target_class: str = "1",
     alpha: float = 0.5,
 ) -> list[Path]:
     """Write a heatmap and an overlay per row of ``df``. Returns the overlay paths."""
