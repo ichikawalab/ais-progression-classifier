@@ -6,6 +6,13 @@ frontal and lateral whole-spine radiographs plus clinical variables.
 > **Research use only.** This software is not a validated medical device and
 > must not be used for clinical decision-making.
 
+This repository contains code related to:
+
+Arima H, Ichikawa S, et al. *Development and Validation of a Multi-Modal
+Ensemble Model for Predicting Progression in Idiopathic Scoliosis*. Global Spine
+Journal. Published online July 31, 2026.
+[https://doi.org/10.1177/21925682261474876](https://doi.org/10.1177/21925682261474876)
+
 ## What the pipeline does
 
 Nine individual models across three modalities, combined by late fusion:
@@ -30,7 +37,7 @@ There are two paths through the code:
 
 ### Why the final model has no holdout
 
-The final model uses all 471 patients. It has no independent performance
+The final model uses the entire input cohort. It has no independent performance
 estimate of its own; reported performance comes from cross-validation.
 
 ## Package layout
@@ -40,7 +47,7 @@ src/ais_progression/
 |-- config.py         typed configuration; defaults are the reference settings
 |-- evaluation.py     AUC and threshold-dependent metrics
 |-- utils.py          seeding, device selection, run metadata
-|-- data/             dataset schema, workbook ingestion, preprocessing, loaders
+|-- data/             dataset schema, preprocessing, and loaders
 |-- models/           image classifiers (timm + Lightning) and clinical models
 |-- ensemble/         weighted averaging and the stacked comparators
 |-- experiments/      splitting, repeated nested cross-validation, reporting
@@ -101,26 +108,6 @@ Borderline patients (6-9 deg) are excluded before this file is built. See
 Patient images, cohort data, outputs, and trained weights are never committed.
 Only the synthetic CSVs under `examples/` are tracked.
 
-### Building it from the study workbooks
-
-`ais-build-dataset` joins the clinical workbook with the two image-path
-workbooks, re-roots the recorded absolute paths onto the local image
-directories, and maps the source `Label` column (2 = progression,
-0 = non-progression) to `label`:
-
-```cmd
-ais-build-dataset --data-dir data --output-csv data\dataset.csv
-```
-
-Workbooks are located by pattern under `--data-dir`. Use `--clinical-xlsx`,
-`--front-xlsx`, `--lateral-xlsx`, `--front-root`, or `--lateral-root` to specify
-them explicitly.
-
-Image paths are written relative to the output CSV, so the dataset stays valid
-when the cohort is moved or shared. Pass `--absolute-paths` to opt out. It also
-writes `data/dataset_report.json` with the cohort summary and any patients
-dropped for a missing image or an unusable label.
-
 ## Preprocessing
 
 CLAHE followed by zero-padding to a square canvas. Intensity normalisation with
@@ -156,15 +143,6 @@ ais-cv-modality --modality clinical --model svm
 ais-cv-modality --modality clinical --model rf
 ```
 
-Run the six image models sequentially on a single GPU. The three clinical models
-can run concurrently in another window.
-
-A completed run contains 100 fold JSON files. Check progress with:
-
-```cmd
-python -c "import pathlib; [print(p.parent.name, len(list(p.glob('rep*_fold*.json')))) for p in sorted(pathlib.Path('outputs/cv').glob('*/folds'))]"
-```
-
 Then the ensembles, which read every completed run under `outputs/cv/`:
 
 ```cmd
@@ -182,11 +160,6 @@ ais-cv-ensemble --method rf
 
 Re-running the same command resumes incomplete folds. Use `--no-resume` to
 recompute or `--keep-checkpoints` to retain fold weights.
-
-Every resumable run pins the resolved configuration, cohort table, fold setup,
-software versions, Git/source-tree identity, and (for image models) radiograph
-bytes in `run_identity.json`. A directory whose identity differs, or which has
-folds but no identity, is rejected instead of mixing results from two runs.
 
 To restrict the ensemble to a subset of modalities, name the base models
 explicitly:
@@ -232,8 +205,8 @@ value. The stacking leakage itself is recorded separately.
 ais-train-final --bundle-dir outputs\final
 ```
 
-This trains the required models on all 471 patients. Image models use the median
-epoch count from cross-validation.
+This trains the required models on the entire input cohort. Image models use the
+median epoch count from cross-validation.
 
 Before training, the command verifies that the selected CV runs match the
 current cohort, configuration, software, source tree, and image data.
@@ -359,32 +332,20 @@ with a small CNN, so they finish in seconds on CPU.
 
 ## Limitations
 
-- Cross-validation is not external validation.
+- Cross-validation is not external validation, and performance may not
+  generalize across institutions, scanners, or populations.
 - Comparing ensemble methods on the same test folds introduces selection bias.
-- Fusion weights are fitted on one out-of-fold probability matrix, as in the
+  Fusion weights are fitted on one out-of-fold probability matrix, as in the
   reference procedure, so ensemble AUC may be optimistic.
 - Final serving weights are refitted on all out-of-fold predictions; reported
   metrics estimate the procedure, not the exact final parameter vector.
-- Performance may not generalize across institutions, scanners, or populations.
 - Calibration is fitted on this cohort and may not generalize.
 - Horizontal flipping alters laterality, which may matter for right- and
   left-sided curves; curve direction is not modelled.
 - Patients with a 6-9 degree increase were excluded, so the model is untested on
   borderline cases.
 - Brace treatment is not a model input, and was not randomly assigned.
-- `train.deterministic` is best-effort: operations without a deterministic
-  kernel fall back and only warn, and mixed precision is not bit-reproducible
-  across GPUs. Use `--set train.precision=32-true` when that matters.
 
 ## License and citation
 
-MIT License. See [LICENSE](LICENSE).
-
-This repository contains code related to:
-
-Arima H, Ichikawa S, et al. *Development and Validation of a Multi-Modal
-Ensemble Model for Predicting Progression in Idiopathic Scoliosis*. Global Spine
-Journal. Published online July 31, 2026.
-[https://doi.org/10.1177/21925682261474876](https://doi.org/10.1177/21925682261474876)
-
-See [CITATION.cff](CITATION.cff) for software citation metadata.
+MIT License. See [LICENSE](LICENSE) and [CITATION.cff](CITATION.cff).
