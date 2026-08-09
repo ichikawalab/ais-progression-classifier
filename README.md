@@ -40,21 +40,6 @@ There are two paths through the code:
 The final model uses the entire input cohort. It has no independent performance
 estimate of its own; reported performance comes from cross-validation.
 
-## Package layout
-
-```text
-src/ais_progression/
-|-- config.py         typed configuration; defaults are the reference settings
-|-- evaluation.py     AUC and threshold-dependent metrics
-|-- utils.py          seeding, device selection, run metadata
-|-- data/             dataset schema, preprocessing, and loaders
-|-- models/           image classifiers (timm + Lightning) and clinical models
-|-- ensemble/         weighted averaging and the stacked comparators
-|-- experiments/      splitting, repeated nested cross-validation, reporting
-|-- final/            full-cohort training, the model bundle, inference
-`-- cli/              one module per command
-```
-
 ## Installation
 
 Python 3.11-3.12 and [uv](https://docs.astral.sh/uv/).
@@ -149,55 +134,17 @@ Then the ensembles, which read every completed run under `outputs/cv/`:
 ais-cv-ensemble --method weighted
 ```
 
-Additional comparison methods are available:
-
-```cmd
-ais-cv-ensemble --method average
-ais-cv-ensemble --method logreg
-ais-cv-ensemble --method svm
-ais-cv-ensemble --method rf
-```
+For comparison, `--method` also accepts `average`, `logreg`, `svm`, and `rf`.
 
 Re-running the same command resumes incomplete folds. Use `--no-resume` to
-recompute or `--keep-checkpoints` to retain fold weights.
-
-To restrict the ensemble to a subset of modalities, name the base models
-explicitly:
-
-```cmd
-ais-cv-ensemble --method weighted --base front_vit=outputs\cv\front_vit --base clinical_logreg=outputs\cv\clinical_logreg --run-dir outputs\ensemble\front_clinical
-```
+recompute them.
 
 ### Outputs
 
-```text
-outputs/
-|-- cv/<modality>_<model>/
-|   |-- config.yaml
-|   |-- environment.json
-|   |-- folds/rep01_fold01.csv, rep01_fold01.json, ...
-|   |-- predictions.csv      patient_id, rep, fold, split, true_label, prob
-|   |-- fold_metrics.csv     per fold: selection_auc, test_auc, best_epoch, sizes
-|   `-- summary.json
-`-- ensemble/<method>/
-    |-- predictions.csv
-    |-- fold_metrics.csv
-    |-- weights_by_fold.csv     (weighted only)
-    |-- weights_summary.json    (weighted only) per model and per modality
-    `-- summary.json
-```
-
-`summary.json` reports:
-
-* `test_auc_pooled_per_rep` - the headline mean and SD across repetitions.
-* `test_auc_per_fold` - test AUC of each individual fold.
-* `selection_auc_by_source` - the selection AUC grouped by source (`holdout`,
-  `inner_cv`, or `train`). These sources are not directly comparable.
-
-Ensemble runs also carry an `ensemble_method_selection_warning`: comparing
-several ensemble methods on the same test folds and keeping the best one adds a
-separate selection bias, so the winner's AUC should be read as a selected-best
-value. The stacking leakage itself is recorded separately.
+Cross-validation results are written under `outputs/cv/` and ensemble results
+under `outputs/ensemble/`. Each run includes predictions, fold metrics, and
+`summary.json`. The headline result is `test_auc_pooled_per_rep`, reported as
+the mean and SD across repetitions.
 
 ## Final model
 
@@ -207,13 +154,6 @@ ais-train-final --bundle-dir outputs\final
 
 This trains the required models on the entire input cohort. Image models use the
 median epoch count from cross-validation.
-
-Before training, the command verifies that the selected CV runs match the
-current cohort, configuration, software, source tree, and image data.
-
-Image models are stored as bare `state_dict` tensors, which keeps the bundle
-small and lets them load with `torch.load(weights_only=True)`. Pass
-`--save-full-checkpoints` for full Lightning checkpoints.
 
 ### Serving profiles
 
@@ -228,26 +168,10 @@ Declare your own with `--profile NAME=MODALITIES`:
 ais-train-final --profile full= --profile cheap=clinical --default-profile full
 ```
 
-Use `--cv-seed` to identify CV runs made with a non-default split seed, and
-`--final-seed` to change the independent seed from which final bundle members
-derive their model-specific seeds.
-
 The default decision threshold uses the median Youden threshold across
 repetitions. Use `--threshold-policy target_sensitivity --target-sensitivity
 0.9` to target sensitivity. Isotonic calibration is the default; alternatives
 are `--calibration platt|none`.
-
-```text
-outputs/final/
-|-- manifest.json        format version, model inventory, serving profiles
-|-- config.yaml
-|-- metrics.json         per-profile cross-validated AUC and operating point
-|-- environment.json     package versions and the dataset SHA256
-`-- models/
-    |-- front_vit.pt ... lateral_convnextv2.pt
-    |-- clinical_logreg.joblib ...
-    `-- calibrator_full.joblib ...
-```
 
 ## Prediction
 
@@ -300,35 +224,12 @@ exploratory and does not establish a causal explanation for a prediction.
 
 ## Configuration
 
-Defaults live in [configs/default.yaml](configs/default.yaml) and reproduce the
-reference settings: AdamW at lr 1e-5 with weight decay 1e-3, batch size 32, up
-to 100 epochs with a 5-epoch linear warmup then cosine annealing, early stopping
-after 5 epochs without validation improvement, inverse-frequency class weights,
-384x384 inputs, and a shared head of LayerNorm, Linear(512), GELU, Dropout(0.5),
-Linear(2). Augmentation is horizontal flipping (p=0.5) and a random resized crop
-covering 50-100% of the image at a fixed 1:1 aspect ratio, applied to training
-folds only.
-
-Override anything from the command line:
+Defaults live in [configs/default.yaml](configs/default.yaml). Override settings
+from the command line with `--set`:
 
 ```cmd
 ais-cv-modality --modality front --model vit --set train.max_epochs=50 --set data.batch_size=8 --reps 2
 ```
-
-Mixed-precision training is not bit-reproducible across GPUs. Set
-`--set train.precision=32-true` for strict reproducibility; inference always
-runs in fp32.
-
-## Tests
-
-```cmd
-uv pip install pytest ruff
-pytest -q
-ruff check .
-```
-
-The integration tests run the whole protocol end to end on a synthetic cohort
-with a small CNN, so they finish in seconds on CPU.
 
 ## Limitations
 
