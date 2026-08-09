@@ -16,28 +16,22 @@ Nine individual models across three modalities, combined by late fusion:
 | Lateral radiograph | ViT, Swin Transformer, ConvNeXtV2 |
 | Clinical variables | Logistic regression, SVM, random forest |
 
-Their predicted probabilities are combined by weighted averaging (the
-best-performing method here), or by simple averaging, logistic
-regression, SVM, or random forest for comparison.
+Their predicted probabilities are combined by weighted averaging. Simple
+averaging, logistic regression, SVM, and random forest are also available for
+comparison.
 
-There are two separate paths through the code:
+There are two paths through the code:
 
-* **Cross-validation** estimates how well the approach generalises. It never
-  produces a model you can deploy, and it is the only source of performance
-  numbers in this repository.
+* **Cross-validation** estimates performance but does not produce a deployable
+  model.
 * **The final model** is trained on the whole cohort and packaged as a bundle
-  for inference on new patients. It keeps no validation split of its own:
-  epoch counts, ensemble weights, decision thresholds and probability
-  calibrators all come from the cross-validation out-of-fold predictions.
+  for inference. Its epoch counts, ensemble weights, thresholds, and calibrators
+  are derived from cross-validation.
 
 ### Why the final model has no holdout
 
-Carving a 10% validation set out of 471 patients would cost training data, and
-its AUC over ~47 patients would be too noisy to mean anything. Worse, the
-ensemble weights are derived from out-of-fold predictions that cover those same
-patients, so such a number would also be biased upward. Instead the final model
-is simply the evaluated procedure applied to all the data, and every figure
-attached to it is the cross-validated one.
+The final model uses all 471 patients. It has no independent performance
+estimate of its own; reported performance comes from cross-validation.
 
 ## Package layout
 
@@ -58,39 +52,30 @@ src/ais_progression/
 
 Python 3.11-3.12 and [uv](https://docs.astral.sh/uv/).
 
-```bash
+```cmd
 git clone https://github.com/ichikawalab/ais-progression-classifier.git
 cd ais-progression-classifier
 uv sync
+call .venv\Scripts\activate.bat
 ```
 
-Every command below is a single invocation with no shell-specific syntax, so it
-runs unchanged in bash, PowerShell, and `cmd.exe`. The one place that differs is
-looping over the nine models, which is spelled out for each shell where it
-appears.
+The commands below assume Windows `cmd.exe` with this environment active.
 
 ### GPU training
 
-`uv sync` resolves torch from PyPI, whose Windows wheels are CPU-only (the Linux
-ones do carry CUDA). For NVIDIA training on Windows, replace them from PyTorch's
-own index afterwards -- the CUDA variant has to match the torch version the lock
-file pins, and not every variant is published for every platform:
+On Windows, replace the PyPI CPU wheels with the appropriate CUDA build after
+`uv sync`:
 
-```bash
+```cmd
 uv pip install --reinstall torch torchvision --index-url https://download.pytorch.org/whl/cu130
+python -c "import torch; print(torch.cuda.is_available(), torch.version.cuda)"
 ```
 
-Pick the variant for your driver from the
+Use the CUDA index recommended by the
 [official PyTorch instructions](https://pytorch.org/get-started/locally/); `cu130`
-is what torch 2.12 ships for Windows. Verify:
-
-```bash
-uv run python -c "import torch; print(torch.cuda.is_available(), torch.version.cuda)"
-```
-
-`uv pip install` changes the environment without touching `uv.lock`, so a later
-`uv sync` puts the CPU wheels back. Re-run the command above if training
-suddenly falls back to the CPU.
+matches the currently locked Windows build. Do not run `uv sync` or plain
+`uv run` afterwards because either may restore the locked CPU wheels. The
+commands below call the active environment directly.
 
 ## Data format
 
@@ -123,14 +108,13 @@ workbooks, re-roots the recorded absolute paths onto the local image
 directories, and maps the source `Label` column (2 = progression,
 0 = non-progression) to `label`:
 
-```bash
-ais-build-dataset --data-dir data --output-csv data/dataset.csv
+```cmd
+ais-build-dataset --data-dir data --output-csv data\dataset.csv
 ```
 
-The workbooks are located by pattern under `--data-dir`, so reorganising the
-cohort into subdirectories does not break the command; pass `--clinical-xlsx`,
-`--front-xlsx`, `--lateral-xlsx`, `--front-root`, or `--lateral-root` to point
-at them explicitly.
+Workbooks are located by pattern under `--data-dir`. Use `--clinical-xlsx`,
+`--front-xlsx`, `--lateral-xlsx`, `--front-root`, or `--lateral-root` to specify
+them explicitly.
 
 Image paths are written relative to the output CSV, so the dataset stays valid
 when the cohort is moved or shared. Pass `--absolute-paths` to opt out. It also
@@ -143,8 +127,8 @@ CLAHE followed by zero-padding to a square canvas. Intensity normalisation with
 the ImageNet mean and standard deviation happens later, in the training
 transform.
 
-```bash
-ais-preprocess --dataset-csv data/dataset.csv --output-dir data/processed --output-csv data/dataset_processed.csv
+```cmd
+ais-preprocess --dataset-csv data\dataset.csv --output-dir data\processed --output-csv data\dataset_processed.csv
 ```
 
 Do not run this twice on the same cohort: CLAHE is not idempotent. DICOM
@@ -153,21 +137,14 @@ data with a validated local workflow first.
 
 ## Cross-validation
 
-Repeated stratified 10-fold cross-validation with 10 repetitions. The outer
-partition for repetition `r` uses `42 + r - 1`. Each fold then receives a stable
-uint32 model seed derived with NumPy `SeedSequence` from `(42, repetition,
-fold)`; that seed drives its validation slice, image initialisation and
-augmentation, inner cross-validation, and Optuna sampler. Consequently a fold
-has the same result whether run continuously, resumed, or scheduled alone.
-Within each repetition one fold is held out for test. Image models carve a
-stratified 1/9 slice out of the remaining folds for early stopping, leaving
-eight folds' worth of training data. Clinical and ensemble models instead tune
-with an inner stratified 10-fold Optuna search over the whole outer training
-fold (nested cross-validation). Both seeds are recorded in every fold's JSON.
+The default evaluation is repeated stratified 10-fold cross-validation with 10
+repetitions. Image models use a validation slice for early stopping; clinical
+and ensemble models use inner 10-fold Optuna tuning. Seeds and split metadata
+are recorded for every fold, and interrupted runs can be resumed.
 
 Run each of the nine individual models:
 
-```bash
+```cmd
 ais-cv-modality --modality front --model vit
 ais-cv-modality --modality front --model swint
 ais-cv-modality --modality front --model convnextv2
@@ -179,50 +156,32 @@ ais-cv-modality --modality clinical --model svm
 ais-cv-modality --modality clinical --model rf
 ```
 
-The six image runs have to be sequential -- one 384-pixel backbone already fills
-a 24 GB card -- but the three clinical ones are scikit-learn and can run beside
-them in another window. To queue them in one go:
+Run the six image models sequentially on a single GPU. The three clinical models
+can run concurrently in another window.
 
-```bash
-# bash
-for m in front lateral; do for k in convnextv2 vit swint; do ais-cv-modality --modality $m --model $k; done; done
-for k in logreg svm rf; do ais-cv-modality --modality clinical --model $k; done
-```
+A completed run contains 100 fold JSON files. Check progress with:
 
-```powershell
-# PowerShell
-foreach ($m in 'front','lateral') { foreach ($k in 'convnextv2','vit','swint') { ais-cv-modality --modality $m --model $k } }
-foreach ($k in 'logreg','svm','rf') { ais-cv-modality --modality clinical --model $k }
-```
-
-```bat
-rem cmd.exe -- use %%m / %%k instead when writing this into a .bat file
-for %m in (front lateral) do for %k in (convnextv2 vit swint) do ais-cv-modality --modality %m --model %k
-for %k in (logreg svm rf) do ais-cv-modality --modality clinical --model %k
-```
-
-A model that fails -- out of memory, say -- does not stop the ones queued after
-it, so count the completed folds before moving on. Each fold writes one file
-pair, and this line needs no shell-specific quoting:
-
-```bash
-uv run python -c "import pathlib; [print(p.parent.name, len(list(p.glob('rep*_fold*.json')))) for p in sorted(pathlib.Path('outputs/cv').glob('*/folds'))]"
+```cmd
+python -c "import pathlib; [print(p.parent.name, len(list(p.glob('rep*_fold*.json')))) for p in sorted(pathlib.Path('outputs/cv').glob('*/folds'))]"
 ```
 
 Then the ensembles, which read every completed run under `outputs/cv/`:
 
-```bash
+```cmd
 ais-cv-ensemble --method weighted
+```
+
+Additional comparison methods are available:
+
+```cmd
 ais-cv-ensemble --method average
 ais-cv-ensemble --method logreg
 ais-cv-ensemble --method svm
 ais-cv-ensemble --method rf
 ```
 
-Each fold is written as it completes, so re-running the same command resumes
-where it stopped. Pass `--no-resume` to recompute. Fold weights are discarded
-after prediction unless you pass `--keep-checkpoints`; a full run would
-otherwise write hundreds of gigabytes.
+Re-running the same command resumes incomplete folds. Use `--no-resume` to
+recompute or `--keep-checkpoints` to retain fold weights.
 
 Every resumable run pins the resolved configuration, cohort table, fold setup,
 software versions, Git/source-tree identity, and (for image models) radiograph
@@ -232,8 +191,8 @@ folds but no identity, is rejected instead of mixing results from two runs.
 To restrict the ensemble to a subset of modalities, name the base models
 explicitly:
 
-```bash
-ais-cv-ensemble --method weighted --base front_vit=outputs/cv/front_vit --base clinical_logreg=outputs/cv/clinical_logreg --run-dir outputs/ensemble/front_clinical
+```cmd
+ais-cv-ensemble --method weighted --base front_vit=outputs\cv\front_vit --base clinical_logreg=outputs\cv\clinical_logreg --run-dir outputs\ensemble\front_clinical
 ```
 
 ### Outputs
@@ -255,18 +214,12 @@ outputs/
     `-- summary.json
 ```
 
-`summary.json` reports AUC three ways:
+`summary.json` reports:
 
-* `test_auc_pooled_per_rep` - the headline number. Within a repetition every
-  patient has exactly one out-of-fold prediction, so the folds combine into a
-  single ROC over the whole cohort. Its mean and SD across repetitions are the
-  figure to report.
+* `test_auc_pooled_per_rep` - the headline mean and SD across repetitions.
 * `test_auc_per_fold` - test AUC of each individual fold.
-* `selection_auc_by_source` - the AUC that drove model selection, grouped by
-  where it came from and never pooled across kinds. For image models it is a
-  held-out slice (`holdout`); for clinical and ensemble models it is the inner
-  cross-validation score (`inner_cv`); for simple averaging it is the training
-  fold (`train`). These are not comparable with one another.
+* `selection_auc_by_source` - the selection AUC grouped by source (`holdout`,
+  `inner_cv`, or `train`). These sources are not directly comparable.
 
 Ensemble runs also carry an `ensemble_method_selection_warning`: comparing
 several ensemble methods on the same test folds and keeping the best one adds a
@@ -275,22 +228,15 @@ value. The stacking leakage itself is recorded separately.
 
 ## Final model
 
-```bash
-ais-train-final --bundle-dir outputs/final
+```cmd
+ais-train-final --bundle-dir outputs\final
 ```
 
-This reads the cross-validation runs under `outputs/cv/`, trains every needed
-model on all 471 patients, and writes a bundle. Image models train for the
-median number of epochs their cross-validated counterparts used, so no data has
-to be held back to discover when to stop. The learning-rate schedule still spans
-`train.max_epochs`, so those epochs follow the same trajectory as in
-cross-validation.
+This trains the required models on all 471 patients. Image models use the median
+epoch count from cross-validation.
 
-Before training, the command verifies that the selected modality-CV identities
-match the current cohort, algorithm, fold settings, software, source tree and
-image bytes. Bundle construction happens in a sibling staging directory; the
-previous complete bundle is replaced only after the new manifest and artifacts
-load successfully.
+Before training, the command verifies that the selected CV runs match the
+current cohort, configuration, software, source tree, and image data.
 
 Image models are stored as bare `state_dict` tensors, which keeps the bundle
 small and lets them load with `torch.load(weights_only=True)`. Pass
@@ -298,22 +244,14 @@ small and lets them load with `torch.load(weights_only=True)`. Pass
 
 ### Serving profiles
 
-A bundle can carry several configurations. The decision threshold and the
-calibrator belong to a *particular* set of models, so a three-model ensemble
-cannot reuse the nine-model threshold without invalidating its reported
-sensitivity and specificity. Each profile therefore has its own weights,
-threshold, calibrator, and cross-validated AUC — all derived from out-of-fold
-predictions, so extra profiles cost no image training. After the outer
-cross-validation, one final serving-weight vector is fitted on all base-model
-OOF probabilities by maximising the mean full-cohort AUC across repetitions;
-it is not an average of the fold-specific weight vectors. The reported AUC,
-threshold, and calibrator continue to come from the outer-fold predictions,
-not from rescoring the development cohort with those final weights.
+A bundle can carry several model combinations. Each profile has its own weights,
+threshold, calibrator, and cross-validated AUC derived from out-of-fold
+predictions. Adding profiles does not repeat image training.
 
 The defaults are `full` (every model), `front_clinical`, and `clinical_only`.
 Declare your own with `--profile NAME=MODALITIES`:
 
-```bash
+```cmd
 ais-train-final --profile full= --profile cheap=clinical --default-profile full
 ```
 
@@ -321,12 +259,10 @@ Use `--cv-seed` to identify CV runs made with a non-default split seed, and
 `--final-seed` to change the independent seed from which final bundle members
 derive their model-specific seeds.
 
-The decision threshold is the median Youden threshold across repetitions. Pass
-`--threshold-policy target_sensitivity --target-sensitivity 0.9` to choose the
-highest observed threshold whose mean sensitivity across repetitions is at least
-0.9. Probabilities are calibrated with isotonic
-regression by default (`--calibration platt|none`); calibration is monotonic, so
-AUC is unchanged and only the meaning of the number improves.
+The default decision threshold uses the median Youden threshold across
+repetitions. Use `--threshold-policy target_sensitivity --target-sensitivity
+0.9` to target sensitivity. Isotonic calibration is the default; alternatives
+are `--calibration platt|none`.
 
 ```text
 outputs/final/
@@ -342,18 +278,17 @@ outputs/final/
 
 ## Prediction
 
-```bash
-ais-predict --bundle-dir outputs/final --input-csv data/new_cases.csv --output-csv predictions.csv
-ais-predict --bundle-dir outputs/final --list-profiles
-ais-predict --bundle-dir outputs/final --profile clinical_only --input-csv ... --output-csv ...
+```cmd
+ais-predict --bundle-dir outputs\final --input-csv data\new_cases.csv --output-csv predictions.csv
+ais-predict --bundle-dir outputs\final --list-profiles
+ais-predict --bundle-dir outputs\final --profile clinical_only --input-csv data\new_cases.csv --output-csv predictions.csv
 ```
 
 The input CSV needs only the fields used by the selected profile: for example,
 `clinical_only` needs no image paths, while a front-only profile needs neither
 the lateral path nor clinical variables. `patient_id` is always required and
-`label` is optional; when present, the AUC of the ensemble and of each base
-model is reported. Output
-holds one column per base model plus `probability`, `calibrated_probability`,
+`label` is optional; when present, AUC is reported. Output holds one column per
+base model plus `probability`, `calibrated_probability`,
 `predicted_label`, `threshold`, `profile`, and `imputed_fields`.
 
 Missing clinical variables are **rejected by default**: imputing them silently
@@ -383,13 +318,11 @@ bundle.release()                 # drop them and free GPU memory
 
 ## Grad-CAM
 
-```bash
-ais-gradcam --bundle-dir outputs/final --modality front --model convnextv2 --input-csv data/dataset.csv --limit 20
+```cmd
+ais-gradcam --bundle-dir outputs\final --modality front --model convnextv2 --input-csv data\dataset.csv --limit 20
 ```
 
-The three configured backbones are ViT, Swin and ConvNeXtV2; the target-layer
-resolver also covers ResNet, DenseNet, Inception and EfficientNet, so a bundle
-built after swapping `image.archs` for one of those still works. Grad-CAM is
+Grad-CAM supports the configured ViT, Swin, and ConvNeXtV2 backbones. It is
 exploratory and does not establish a causal explanation for a prediction.
 
 ## Configuration
@@ -405,7 +338,7 @@ folds only.
 
 Override anything from the command line:
 
-```bash
+```cmd
 ais-cv-modality --modality front --model vit --set train.max_epochs=50 --set data.batch_size=8 --reps 2
 ```
 
@@ -415,10 +348,10 @@ runs in fp32.
 
 ## Tests
 
-```bash
-uv sync --extra dev
-uv run pytest -q
-uv run ruff check .
+```cmd
+uv pip install pytest ruff
+pytest -q
+ruff check .
 ```
 
 The integration tests run the whole protocol end to end on a synthetic cohort
@@ -427,23 +360,13 @@ with a small CNN, so they finish in seconds on CPU.
 ## Limitations
 
 - Cross-validation is not external validation.
-- The ensemble method was chosen by comparing candidates on the same test folds
-  that report its performance, so its AUC is a selected-best value.
-- The ensembles are fitted on a single out-of-fold probability matrix, as in the
-  reference procedure. A training patient's probability therefore came from a
-  base model that had seen the current test fold, so the fusion weights are
-  chosen with indirect knowledge of it and the reported ensemble AUC is
-  optimistic. Removing this would mean regenerating the base models' out-of-fold
-  probabilities inside every outer fold -- ten times the image training, and no
-  longer the reference method.
-- The final serving weights are refitted on all base-model OOF probabilities,
-  while AUC, threshold and calibration are estimated from outer-fold ensemble
-  predictions. As with any full-data refit after cross-validation, those values
-  estimate the fitting procedure rather than directly evaluating the exact
-  final parameter vector.
+- Comparing ensemble methods on the same test folds introduces selection bias.
+- Fusion weights are fitted on one out-of-fold probability matrix, as in the
+  reference procedure, so ensemble AUC may be optimistic.
+- Final serving weights are refitted on all out-of-fold predictions; reported
+  metrics estimate the procedure, not the exact final parameter vector.
 - Performance may not generalize across institutions, scanners, or populations.
-- Calibration improves how probabilities read, but it is fitted on this cohort
-  and carries no guarantee elsewhere.
+- Calibration is fitted on this cohort and may not generalize.
 - Horizontal flipping alters laterality, which may matter for right- and
   left-sided curves; curve direction is not modelled.
 - Patients with a 6-9 degree increase were excluded, so the model is untested on
@@ -455,4 +378,13 @@ with a small CNN, so they finish in seconds on CPU.
 
 ## License and citation
 
-MIT License. See [LICENSE](LICENSE) and [CITATION.cff](CITATION.cff).
+MIT License. See [LICENSE](LICENSE).
+
+This repository contains code related to:
+
+Arima H, Ichikawa S, et al. *Development and Validation of a Multi-Modal
+Ensemble Model for Predicting Progression in Idiopathic Scoliosis*. Global Spine
+Journal. Published online July 31, 2026.
+[https://doi.org/10.1177/21925682261474876](https://doi.org/10.1177/21925682261474876)
+
+See [CITATION.cff](CITATION.cff) for software citation metadata.
