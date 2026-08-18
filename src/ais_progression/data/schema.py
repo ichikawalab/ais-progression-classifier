@@ -28,10 +28,12 @@ CLINICAL_COLUMNS = ["age", "sex", "risser", "cobb_baseline"]
 
 SEX_CODES = (1, 2)  # 1 = male, 2 = female
 # Plausible ranges for adolescent idiopathic scoliosis at the initial visit.
-# Deliberately generous: the point is to catch data-entry errors and unit
-# mix-ups, not to restrict the cohort.
+# The Risser and Cobb bounds are deliberately generous: they catch data-entry
+# errors and unit mix-ups rather than restricting the cohort. The age bound is
+# tighter on purpose, and does restrict the cohort to the adolescent range the
+# models were trained on.
 FEATURE_BOUNDS: dict[str, tuple[float, float]] = {
-    "age": (5.0, 25.0),
+    "age": (10.0, 18.0),
     "risser": (0.0, 5.0),
     "cobb_baseline": (0.0, 150.0),
 }
